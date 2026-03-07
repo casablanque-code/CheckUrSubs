@@ -1,0 +1,68 @@
+@import "tailwindcss";
+
+body {
+  background-color: black;
+  margin: 0;
+  color: white;
+  overflow-y: scroll;
+  scrollbar-width: none; /* Firefox */
+}
+
+body::-webkit-scrollbar { display: none; } /* Chrome/Safari */
+
+/* Прячем скроллбар везде */
+* {
+  scrollbar-width: none;
+  -ms-overflow-style: none;
+}
+*::-webkit-scrollbar {
+  display: none;
+}
+
+/* Без стрелочек у numeric-input, но с цифровой клавиатурой */
+input[type="number"]::-webkit-inner-spin-button,
+input[type="number"]::-webkit-outer-spin-button {
+  -webkit-appearance: none;
+  margin: 0;
+}
+
+input[type="number"] {
+  -moz-appearance: textfield;
+}
+
+/* Безопасные отступы под вырезы и жесты iPhone */
+.safe-bottom {
+  padding-bottom: env(safe-area-inset-bottom);
+}
+
+.safe-top {
+  padding-top: env(safe-area-inset-top);
+}
+
+/* Жесты для тача */
+.touch-pan-x {
+  touch-action: pan-x;
+}
+
+.touch-pan-y {
+  touch-action: pan-y;
+}
+
+/* Анимация прогресс-бара тоста (5 секунд) */
+@keyframes toast-progress {
+  from {
+    width: 100%;
+  }
+  to {
+    width: 0%;
+  }
+}
+
+.animate-toast-progress {
+  animation: toast-progress 5s linear forwards;
+}
+/* Блокируем iOS 18 PWA back/forward gesture */
+html, body {
+  overscroll-behavior: none;
+  overscroll-behavior-x: none;
+}
