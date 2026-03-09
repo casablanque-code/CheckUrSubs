@@ -5,7 +5,7 @@ import {
   CalendarDays, ChevronDown, Check, ArrowUpDown, Search, X,
   RefreshCw, Gamepad2, Briefcase, Cloud, Music, BookOpen, Zap,
   Shield, Heart, Sparkles, SwatchBook, ChevronRight, LogOut,
-  Wifi, Globe, Phone, Server, Tv, MonitorSmartphone, Package, Wallet
+  Wifi, Globe, Phone, Server, Tv, MonitorSmartphone, Package, Wallet, MessageCircle, Download, Bell
 } from 'lucide-react';
 import { supabase } from './lib/supabase';
 import Auth from './Auth';
@@ -280,6 +280,14 @@ const useTabSwipe = (activeTab, setActiveTab, enabled = true) => {
   return ref;
 };
 
+// VAPID helper
+const urlBase64ToUint8Array = (base64String) => {
+  const padding = '='.repeat((4 - base64String.length % 4) % 4);
+  const base64 = (base64String + padding).replace(/-/g, '+').replace(/_/g, '/');
+  const rawData = window.atob(base64);
+  return Uint8Array.from([...rawData].map(c => c.charCodeAt(0)));
+};
+
 // ═══════════════════════════════════════════════════════════════════════════════
 // APP
 // ═══════════════════════════════════════════════════════════════════════════════
@@ -301,6 +309,46 @@ const App = ({ session }) => {
   const [swipeHinted,  setSwipeHinted]  = useState(() => localStorage.getItem('swipeHinted') === '1');
   const [calMonth,     setCalMonth]     = useState(() => new Date().getMonth());
   const [calYear,      setCalYear]      = useState(() => new Date().getFullYear());
+
+  const [pushBanner,   setPushBanner]   = useState(false);
+
+  const VAPID_PUBLIC_KEY = 'BI--t_Ek8gyvTt8tn9LTcceNQgrw7u_e1NQFkrFpSqGZ7s2VBJK2hQ2wPfLJ7lckNBiCRqWno1-jg2Qy4qNXvmo';
+
+  // Проверяем нужно ли показать баннер запроса push
+  useEffect(() => {
+    if (!('Notification' in window) || !('serviceWorker' in navigator)) return;
+    if (Notification.permission === 'granted') return; // уже разрешено
+    if (Notification.permission === 'denied') return;  // уже отклонено
+    if (localStorage.getItem('pushBannerDismissed')) return;
+    // Показываем через 3 секунды после входа — не сразу
+    const t = setTimeout(() => setPushBanner(true), 3000);
+    return () => clearTimeout(t);
+  }, []);
+
+  const subscribePush = async () => {
+    try {
+      const reg = await navigator.serviceWorker.ready;
+      const sub = await reg.pushManager.subscribe({
+        userVisibleOnly: true,
+        applicationServerKey: urlBase64ToUint8Array(VAPID_PUBLIC_KEY),
+      });
+      // Сохраняем подписку в Supabase
+      await supabase.from('push_subscriptions').upsert({
+        user_id: userId,
+        subscription: JSON.stringify(sub),
+        updated_at: new Date().toISOString(),
+      }, { onConflict: 'user_id' });
+      setPushBanner(false);
+    } catch (e) {
+      console.error('Push subscribe error:', e);
+      setPushBanner(false);
+    }
+  };
+
+  const dismissPushBanner = () => {
+    localStorage.setItem('pushBannerDismissed', '1');
+    setPushBanner(false);
+  };
 
   const curr = getCurrency(currency);
   const rate = rates[currency] ?? DEFAULT_RATES[currency] ?? 1;
@@ -375,7 +423,31 @@ const App = ({ session }) => {
     }
   }, [subscriptions.length, swipeHinted]);
 
-  const totalMonthlyUSD = subscriptions.reduce((a, s) => a + monthly(s), 0);
+  // Авто-активация пробных у которых trial_end прошёл
+  const activatingRef = useRef(new Set());
+  useEffect(() => {
+    if (subscriptions.length === 0) return;
+    const today = new Date().toISOString().split('T')[0];
+    const toActivate = subscriptions.filter(s =>
+      s.status === 'trial' && s.trial_end && s.trial_end <= today && !activatingRef.current.has(s.id)
+    );
+    if (toActivate.length === 0) return;
+    toActivate.forEach(async (s) => {
+      activatingRef.current.add(s.id);
+      const endDate = new Date(s.trial_end);
+      const newDate = `${endDate.getDate()} ${MONTHS_SHORT[endDate.getMonth()]}`;
+      const { data } = await supabase.from('subscriptions')
+        .update({ status: 'active', trial_end: null, date: newDate })
+        .eq('id', s.id).select().single();
+      if (data) setSubscriptions(prev => prev.map(p =>
+        p.id === s.id ? { ...p, status: 'active', trial_end: null, date: newDate, billingDay: endDate.getDate() } : p
+      ));
+    });
+  }, [subscriptions]);
+
+  // Только активные считаются в суммах (пробные и паузные = 0)
+  const activeSubs  = subscriptions.filter(s => !s.status || s.status === 'active');
+  const totalMonthlyUSD = activeSubs.reduce((a, s) => a + monthly(s), 0);
   const totalYearlyUSD  = totalMonthlyUSD * 12;
 
   const openAdd  = () => { setEditingSub(null); setIsModalOpen(true); };
@@ -391,6 +463,8 @@ const App = ({ session }) => {
       period:        payload.period,
       category:      payload.category,
       logo:          payload.logo || '',
+      status:        payload.status || 'active',
+      trial_end:     payload.trial_end || null,
       user_id:       userId,
     };
 
@@ -434,7 +508,7 @@ const App = ({ session }) => {
     setToast(null);
   };
 
-  const soonSubs = subscriptions
+  const soonSubs = activeSubs
     .filter(s => isDueWithinDays(s, 7))
     .sort((a, b) => (a.billingDay || 99) - (b.billingDay || 99));
 
@@ -451,8 +525,8 @@ const App = ({ session }) => {
 
   const byCategory = CATEGORIES.map(cat => ({
     ...cat,
-    subs:  subscriptions.filter(s => s.category === cat.id),
-    total: subscriptions.filter(s => s.category === cat.id).reduce((a, s) => a + monthly(s), 0),
+    subs:  activeSubs.filter(s => s.category === cat.id),
+    total: activeSubs.filter(s => s.category === cat.id).reduce((a, s) => a + monthly(s), 0),
   })).filter(c => c.subs.length > 0);
 
   const handleLogout = () => supabase.auth.signOut();
@@ -472,15 +546,42 @@ const App = ({ session }) => {
 
           {/* ════ HOME ════ */}
           <div ref={tabRefs.home} className={`absolute inset-0 overflow-y-auto no-scrollbar pb-32 safe-top ${activeTab === 'home' ? 'block' : 'hidden'}`}>
-            <div className="p-4 space-y-8">
+            <div className="p-4 space-y-5">
               <header className="relative flex items-center justify-between px-1 pt-2">
-                <div className="w-10 h-10" /> {/* spacer */}
+                <SupportMenu />
                 <h1 className="absolute left-1/2 -translate-x-1/2 text-lg font-semibold tracking-tight whitespace-nowrap">Подписки</h1>
                 {/* Аватар с дропдауном */}
                 <AvatarMenu session={session} onLogout={handleLogout} />
               </header>
 
-              <section className="bg-gradient-to-b from-zinc-800/40 to-zinc-900/20 border border-zinc-800 rounded-[40px] p-7 text-center shadow-2xl">
+              {/* Push-баннер */}
+              <AnimatePresence>
+                {pushBanner && (
+                  <motion.div
+                    initial={{ opacity: 0, y: -8 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    exit={{ opacity: 0, y: -8 }}
+                    transition={{ duration: 0.2 }}
+                    className="flex items-center gap-3 bg-zinc-900 border border-zinc-700 rounded-2xl px-4 py-3">
+                    <div className="w-8 h-8 rounded-xl bg-violet-500/15 border border-violet-500/30 flex items-center justify-center shrink-0">
+                      <Bell className="w-4 h-4 text-violet-400" />
+                    </div>
+                    <div className="flex-1 min-w-0">
+                      <p className="text-sm font-medium leading-tight">Напоминания о платежах</p>
+                      <p className="text-xs text-zinc-500 mt-0.5">Уведомим за 3 дня до списания</p>
+                    </div>
+                    <button onClick={subscribePush}
+                      className="text-xs font-semibold text-violet-400 bg-violet-500/15 border border-violet-500/30 px-3 py-1.5 rounded-xl shrink-0 active:scale-95 transition">
+                      Включить
+                    </button>
+                    <button onClick={dismissPushBanner} className="text-zinc-600 hover:text-zinc-400 transition shrink-0">
+                      <X className="w-4 h-4" />
+                    </button>
+                  </motion.div>
+                )}
+              </AnimatePresence>
+
+              <section className="bg-gradient-to-b from-zinc-800/40 to-zinc-900/20 border border-zinc-800 rounded-[40px] p-6 text-center shadow-2xl">
                 <p className="text-zinc-500 uppercase text-[10px] tracking-[0.22em] font-semibold mb-2">В месяц</p>
                 <h2 className="text-6xl font-bold tracking-tighter mb-3">{fmt(totalMonthlyUSD)}</h2>
                 <div className="flex items-center justify-center gap-2">
@@ -490,11 +591,32 @@ const App = ({ session }) => {
                     <RefreshCw className={`w-3 h-3 ${ratesLoading ? 'animate-spin' : ''}`} />
                   </button>
                 </div>
-                <div className="inline-flex items-center gap-2 bg-green-500/10 text-green-400 px-4 py-1.5 rounded-full text-xs font-semibold uppercase tracking-[0.16em] mt-3">
-                  <span className="w-1.5 h-1.5 rounded-full bg-green-400 animate-pulse" />
-                  {subscriptions.length} активных
+                <div className="flex items-center justify-center flex-wrap gap-2 mt-3">
+                  {(() => {
+                    const active  = subscriptions.filter(s => !s.status || s.status === 'active').length;
+                    const paused  = subscriptions.filter(s => s.status === 'paused').length;
+                    const trial   = subscriptions.filter(s => s.status === 'trial').length;
+                    return <>
+                      <div className="inline-flex items-center gap-2 bg-green-500/10 text-green-400 px-4 py-1.5 rounded-full text-xs font-semibold uppercase tracking-[0.16em]">
+                        <span className="w-1.5 h-1.5 rounded-full bg-green-400 animate-pulse" />
+                        {active} активных
+                      </div>
+                      {paused > 0 && (
+                        <div className="inline-flex items-center gap-2 bg-red-500/10 text-red-400 px-4 py-1.5 rounded-full text-xs font-semibold uppercase tracking-[0.16em]">
+                          <span className="w-1.5 h-1.5 rounded-full bg-red-400" />
+                          {paused} на паузе
+                        </div>
+                      )}
+                      {trial > 0 && (
+                        <div className="inline-flex items-center gap-2 bg-amber-500/10 text-amber-400 px-4 py-1.5 rounded-full text-xs font-semibold uppercase tracking-[0.16em]">
+                          <span className="w-1.5 h-1.5 rounded-full bg-amber-400 animate-pulse" />
+                          {trial} пробных
+                        </div>
+                      )}
+                    </>;
+                  })()}
                 </div>
-                <div className="grid grid-cols-2 mt-6 text-left border-t border-zinc-800/60 pt-5">
+                <div className="grid grid-cols-2 mt-5 text-left border-t border-zinc-800/60 pt-4">
                   <div>
                     <p className="text-xl font-semibold">{fmt(totalYearlyUSD)}</p>
                     <p className="text-zinc-500 text-[10px] uppercase font-semibold mt-1">За год</p>
@@ -507,7 +629,7 @@ const App = ({ session }) => {
               </section>
 
               {/* Кнопка добавить */}
-              <div className="flex justify-center">
+              <div className="flex justify-center -mt-1">
                 <button onClick={openAdd}
                   className="w-2/3 flex items-center justify-center gap-2 bg-white text-black font-semibold text-sm rounded-2xl py-3.5 active:scale-[0.97] transition shadow-lg">
                   <Plus className="w-4 h-4" />
@@ -563,39 +685,25 @@ const App = ({ session }) => {
                   <CalendarDays className="w-4 h-4 text-sky-300" />
                 </div>
               </header>
-              <CalendarSection subscriptions={subscriptions} fmt={fmt} fmtReal={fmtReal} monthly={monthly} month={calMonth} year={calYear}
-                onPrev={() => { if (calMonth === 0) { setCalMonth(11); setCalYear(y => y-1); } else setCalMonth(m => m-1); }}
-                onNext={() => { if (calMonth === 11) { setCalMonth(0); setCalYear(y => y+1); } else setCalMonth(m => m+1); }}
-              />
               {(() => {
                 const now    = new Date();
                 const isPast = calYear < now.getFullYear() || (calYear === now.getFullYear() && calMonth < now.getMonth());
-                const calSubs = subscriptions.filter(sub => {
-                  if (!sub.created_at && !sub.createdAt) return true;
-                  const c = new Date(sub.created_at ?? sub.createdAt);
-                  return c.getFullYear() < calYear || (c.getFullYear() === calYear && c.getMonth() <= calMonth);
-                });
-                const calTotal = calSubs.reduce((a, s) => {
+                const calSubs = subscriptions.filter(sub => sub.status !== 'paused');
+                const activCalSubs = calSubs.filter(s => !s.status || s.status === 'active');
+                const calTotal = activCalSubs.reduce((a, s) => {
                   if (s.period === 'yearly') {
                     const billingMonth = extractBillingMonth(s.date);
                     return billingMonth === calMonth ? a + monthly(s) * 12 : a;
                   }
                   return a + monthly(s);
                 }, 0);
-                // «В год» = месячные × 12 + годовые × 1 (они уже годовые)
-                const calYearly = calSubs.reduce((a, s) =>
-                  a + monthly(s) * 12, 0);
+                const calYearly = activCalSubs.reduce((a, s) => a + monthly(s) * 12, 0);
                 return (
-                  <div className="bg-[#1C1C1E] rounded-3xl border border-zinc-800/60 p-5 space-y-2">
-                    <div className="flex justify-between text-sm">
-                      <span className="text-zinc-400">{isPast ? `Потрачено в ${MONTHS_GENITIVE[calMonth]}` : `Ожидается в ${MONTHS_GENITIVE[calMonth]}`}</span>
-                      <span className="font-semibold">{fmt(calTotal)}</span>
-                    </div>
-                    <div className="flex justify-between text-sm">
-                      <span className="text-zinc-400">В год</span>
-                      <span className="font-semibold">{fmt(calYearly)}</span>
-                    </div>
-                  </div>
+                  <CalendarSection subscriptions={subscriptions} fmt={fmt} fmtReal={fmtReal} monthly={monthly} month={calMonth} year={calYear}
+                    onPrev={() => { if (calMonth === 0) { setCalMonth(11); setCalYear(y => y-1); } else setCalMonth(m => m-1); }}
+                    onNext={() => { if (calMonth === 11) { setCalMonth(0); setCalYear(y => y+1); } else setCalMonth(m => m+1); }}
+                    calTotal={calTotal} calYearly={calYearly} isPast={isPast} calMonth={calMonth}
+                  />
                 );
               })()}
             </div>
@@ -651,10 +759,11 @@ const App = ({ session }) => {
                   })}
                 </div>
               )}
+              {/* По подпискам */}
               <div className="bg-[#1C1C1E] rounded-3xl border border-zinc-800/60 p-5 space-y-4">
                 <p className="text-xs text-zinc-500 uppercase tracking-[0.16em]">По подпискам</p>
-                {subscriptions.length === 0 && <p className="text-sm text-zinc-500">Добавьте хотя бы одну подписку.</p>}
-                {[...subscriptions].sort((a, b) => monthly(b) - monthly(a)).map(sub => {
+                {activeSubs.length === 0 && <p className="text-sm text-zinc-500">Добавьте хотя бы одну подписку.</p>}
+                {[...activeSubs].sort((a, b) => monthly(b) - monthly(a)).map(sub => {
                   const share = totalMonthlyUSD ? (monthly(sub) / totalMonthlyUSD) * 100 : 0;
                   return (
                     <div key={sub.id} className="space-y-1.5">
@@ -676,6 +785,47 @@ const App = ({ session }) => {
                   );
                 })}
               </div>
+              {/* Пробный период — внизу */}
+              {(() => {
+                const trialSubs = subscriptions.filter(s => s.status === 'trial');
+                if (trialSubs.length === 0) return null;
+                return (
+                  <div className="bg-[#1C1C1E] rounded-3xl border border-amber-500/20 p-5 space-y-3">
+                    <p className="text-xs text-amber-400/70 uppercase tracking-[0.16em]">Пробный период</p>
+                    {trialSubs.map(sub => (
+                      <div key={sub.id} className="flex items-center justify-between gap-3">
+                        <div className="flex items-center gap-3 min-w-0">
+                          <LogoIcon sub={sub} size="sm" />
+                          <div className="min-w-0">
+                            <p className="text-sm font-medium truncate">{sub.name}</p>
+                            {sub.trial_end && <p className="text-[10px] text-zinc-500">до {new Date(sub.trial_end).toLocaleDateString('ru-RU', { day: 'numeric', month: 'long' })}</p>}
+                          </div>
+                        </div>
+                        <p className="text-sm text-zinc-500 shrink-0">—</p>
+                      </div>
+                    ))}
+                  </div>
+                );
+              })()}
+              {/* На паузе — внизу */}
+              {(() => {
+                const pausedSubs = subscriptions.filter(s => s.status === 'paused');
+                if (pausedSubs.length === 0) return null;
+                return (
+                  <div className="bg-[#1C1C1E] rounded-3xl border border-red-500/20 p-5 space-y-3">
+                    <p className="text-xs text-red-400/70 uppercase tracking-[0.16em]">На паузе</p>
+                    {pausedSubs.map(sub => (
+                      <div key={sub.id} className="flex items-center justify-between gap-3">
+                        <div className="flex items-center gap-3 min-w-0">
+                          <LogoIcon sub={sub} size="sm" />
+                          <p className="text-sm font-medium truncate">{sub.name}</p>
+                        </div>
+                        <p className="text-sm text-zinc-500 shrink-0">—</p>
+                      </div>
+                    ))}
+                  </div>
+                );
+              })()}
             </div>
           </div>
         </div>
@@ -803,6 +953,14 @@ const ONBOARDING_STEPS = [
     title: 'Анализируй расходы',
     subtitle: 'Вкладка «Аналитика» разбивает траты по категориям и сервисам. Выбери удобную валюту — курс обновляется автоматически.',
   },
+  {
+    type: 'pwa',
+    icon: Download,
+    iconColor: 'text-green-300',
+    iconBg: 'bg-green-500/15',
+    title: 'Установи приложение',
+    subtitle: 'Добавь на экран домой — работает как обычное приложение, без адресной строки браузера.',
+  },
 ];
 
 const Onboarding = ({ onDone }) => {
@@ -856,6 +1014,78 @@ const Onboarding = ({ onDone }) => {
                   </div>
                 )}
 
+                {/* PWA-инструкция */}
+                {s.type === 'pwa' && (() => {
+                  const ua = navigator.userAgent;
+                  const isIOS = /iPad|iPhone|iPod/.test(ua);
+                  const isAndroid = /Android/.test(ua);
+                  return (
+                    <div className="w-full space-y-3 mb-4">
+                      {(isIOS || (!isIOS && !isAndroid)) && (
+                        <div className="bg-zinc-900 border border-zinc-800 rounded-2xl p-4 text-left space-y-3">
+                          <p className="text-xs text-zinc-500 uppercase tracking-widest">iOS · Safari</p>
+                          <div className="flex items-center gap-3">
+                            <div className="w-9 h-9 rounded-xl bg-blue-500/15 border border-blue-500/30 flex items-center justify-center shrink-0">
+                              {/* Share icon iOS */}
+                              <svg viewBox="0 0 24 24" className="w-4 h-4 text-blue-400" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                                <path d="M4 12v8a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-8"/>
+                                <polyline points="16 6 12 2 8 6"/>
+                                <line x1="12" y1="2" x2="12" y2="15"/>
+                              </svg>
+                            </div>
+                            <div>
+                              <p className="text-sm font-medium text-white">Нажми «Поделиться»</p>
+                              <p className="text-xs text-zinc-500">Кнопка внизу браузера</p>
+                            </div>
+                          </div>
+                          <div className="flex items-center gap-3">
+                            <div className="w-9 h-9 rounded-xl bg-zinc-800 border border-zinc-700 flex items-center justify-center shrink-0">
+                              <svg viewBox="0 0 24 24" className="w-4 h-4 text-zinc-300" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                                <rect x="5" y="2" width="14" height="20" rx="2"/>
+                                <line x1="12" y1="6" x2="12" y2="6"/>
+                                <line x1="9" y1="18" x2="15" y2="18"/>
+                              </svg>
+                            </div>
+                            <div>
+                              <p className="text-sm font-medium text-white">«На экран «Домой»»</p>
+                              <p className="text-xs text-zinc-500">Прокрути список вниз</p>
+                            </div>
+                          </div>
+                        </div>
+                      )}
+                      {(isAndroid || (!isIOS && !isAndroid)) && (
+                        <div className="bg-zinc-900 border border-zinc-800 rounded-2xl p-4 text-left space-y-3">
+                          <p className="text-xs text-zinc-500 uppercase tracking-widest">Android · Chrome</p>
+                          <div className="flex items-center gap-3">
+                            <div className="w-9 h-9 rounded-xl bg-zinc-800 border border-zinc-700 flex items-center justify-center shrink-0">
+                              {/* Three dots menu */}
+                              <svg viewBox="0 0 24 24" className="w-4 h-4 text-zinc-300" fill="currentColor">
+                                <circle cx="12" cy="5" r="1.5"/><circle cx="12" cy="12" r="1.5"/><circle cx="12" cy="19" r="1.5"/>
+                              </svg>
+                            </div>
+                            <div>
+                              <p className="text-sm font-medium text-white">Меню браузера</p>
+                              <p className="text-xs text-zinc-500">Три точки справа вверху</p>
+                            </div>
+                          </div>
+                          <div className="flex items-center gap-3">
+                            <div className="w-9 h-9 rounded-xl bg-green-500/15 border border-green-500/30 flex items-center justify-center shrink-0">
+                              <svg viewBox="0 0 24 24" className="w-4 h-4 text-green-400" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                                <path d="M12 2L12 16M12 16L8 12M12 16L16 12"/>
+                                <path d="M3 20h18"/>
+                              </svg>
+                            </div>
+                            <div>
+                              <p className="text-sm font-medium text-white">«Установить приложение»</p>
+                              <p className="text-xs text-zinc-500">Или «Добавить на гл. экран»</p>
+                            </div>
+                          </div>
+                        </div>
+                      )}
+                    </div>
+                  );
+                })()}
+
                 {/* Описание */}
                 <p className="text-zinc-400 text-sm leading-relaxed">{s.subtitle}</p>
               </motion.div>
@@ -887,6 +1117,138 @@ const Onboarding = ({ onDone }) => {
 };
 
 // ─── Аватар с меню выхода ───────────────────────────────────────────────────────
+// ─── Support Menu ──────────────────────────────────────────────────────────────
+const SUPPORT_LINKS = [
+  {
+    id: 'boosty',
+    label: 'Boosty',
+    hint: 'Карта / СБП',
+    url: 'https://boosty.to/casablanque/donate',
+    bg: 'bg-orange-500/15',
+    border: 'border-orange-500/30',
+    color: 'text-orange-400',
+    icon: () => (
+      <svg viewBox="0 0 24 24" className="w-4 h-4" fill="currentColor">
+        <path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm-1 14H9V8h2v8zm4 0h-2V8h2v8z"/>
+      </svg>
+    ),
+  },
+  {
+    id: 'usdt',
+    label: 'USDT',
+    hint: 'Avalanche C-Chain (AVAXC)',
+    url: null,
+    address: '0x3bE6114bc999482843bde238F4e17997B5355F76',
+    bg: 'bg-emerald-500/15',
+    border: 'border-emerald-500/30',
+    color: 'text-emerald-400',
+    icon: () => (
+      <svg viewBox="0 0 24 24" className="w-4 h-4" fill="currentColor">
+        <path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm.75 13.5v1.5h-1.5v-1.5C9.5 15.83 8.5 14.92 8.5 13.75h1.5c0 .55.67 1 1.5 1s1.5-.45 1.5-1c0-.59-.54-.88-1.76-1.22C9.87 12.1 8.5 11.5 8.5 10.25 8.5 9.08 9.5 8.17 11.25 8V6.5h1.5V8c1.75.17 2.75 1.08 2.75 2.25h-1.5c0-.55-.67-1-1.5-1s-1.5.45-1.5 1c0 .55.49.84 1.74 1.18 1.38.38 2.76.96 2.76 2.32 0 1.17-1 2.08-2.75 2.25z"/>
+      </svg>
+    ),
+  },
+];
+
+const SupportMenu = () => {
+  const [open, setOpen] = useState(false);
+  const [copied, setCopied] = useState(false);
+  const [wordText, setWordText] = useState('');
+  const [wordStatus, setWordStatus] = useState(null); // 'sending' | 'sent' | 'error'
+  const ref = useRef(null);
+
+  useEffect(() => {
+    if (!open) return;
+    const handler = (e) => { if (ref.current && !ref.current.contains(e.target)) setOpen(false); };
+    document.addEventListener('mousedown', handler);
+    document.addEventListener('touchstart', handler);
+    return () => { document.removeEventListener('mousedown', handler); document.removeEventListener('touchstart', handler); };
+  }, [open]);
+
+  const copyAddress = (address) => {
+    navigator.clipboard.writeText(address).then(() => {
+      setCopied(true);
+      setTimeout(() => setCopied(false), 2000);
+    });
+  };
+
+  const sendWord = async () => {
+    if (!wordText.trim()) return;
+    setWordStatus('sending');
+    const { error } = await supabase.from('messages').insert({ text: wordText.trim() });
+    if (error) { setWordStatus('error'); return; }
+    setWordStatus('sent');
+    setWordText('');
+    setTimeout(() => setWordStatus(null), 3000);
+  };
+
+  return (
+    <div ref={ref} className="relative">
+      <button onClick={() => setOpen(v => !v)}
+        className="w-10 h-10 rounded-full border-2 border-zinc-700 bg-zinc-800 flex items-center justify-center active:scale-95 transition shrink-0">
+        <Heart className="w-4 h-4 text-zinc-300" />
+      </button>
+      <AnimatePresence>
+        {open && (
+          <motion.div initial={{ opacity: 0, scale: 0.92, y: -6 }} animate={{ opacity: 1, scale: 1, y: 0 }}
+            exit={{ opacity: 0, scale: 0.92, y: -6 }} transition={{ duration: 0.15 }}
+            className="absolute left-0 top-12 bg-zinc-900 border border-zinc-700 rounded-2xl shadow-2xl z-50 w-[220px] overflow-hidden">
+            <div className="px-4 py-3 border-b border-zinc-800">
+              <p className="text-xs font-semibold text-zinc-200">Поддержать разработчика</p>
+              <p className="text-[11px] text-zinc-500 mt-0.5">Приложение бесплатное и всегда будет таким</p>
+            </div>
+            {SUPPORT_LINKS.map(link => (
+              <div key={link.id} className={`mx-3 my-2 rounded-xl border ${link.border} ${link.bg} p-3`}>
+                <div className="flex items-center gap-2 mb-2">
+                  <span className={link.color}><link.icon /></span>
+                  <span className="text-sm font-semibold text-zinc-100">{link.label}</span>
+                  <span className="text-[10px] text-zinc-500 ml-auto">{link.hint}</span>
+                </div>
+                {link.url ? (
+                  <a href={link.url} target="_blank" rel="noopener noreferrer"
+                    onClick={() => setOpen(false)}
+                    className={`block w-full text-center text-xs font-semibold py-1.5 rounded-lg ${link.color} bg-black/20 active:scale-95 transition`}>
+                    Открыть →
+                  </a>
+                ) : (
+                  <button onClick={() => copyAddress(link.address)}
+                    className={`w-full text-xs font-semibold py-1.5 rounded-lg ${link.color} bg-black/20 active:scale-95 transition`}>
+                    {copied ? '✓ Скопировано' : 'Скопировать адрес'}
+                  </button>
+                )}
+              </div>
+            ))}
+            {/* Добрым словом */}
+            <div className="mx-3 mb-3 rounded-xl border border-pink-500/30 bg-pink-500/10 p-3">
+              <div className="flex items-center gap-2 mb-2">
+                <MessageCircle className="w-4 h-4 text-pink-400" />
+                <span className="text-sm font-semibold text-zinc-100">Добрым словом</span>
+              </div>
+              {wordStatus === 'sent'
+                ? <p className="text-xs text-pink-400 text-center py-1">❤️ Спасибо, это важно!</p>
+                : <>
+                    <textarea
+                      value={wordText}
+                      onChange={e => setWordText(e.target.value)}
+                      placeholder="Напишите что думаете..."
+                      rows={3}
+                      className="w-full bg-black/20 rounded-lg text-xs text-zinc-200 placeholder-zinc-600 px-2.5 py-2 resize-none outline-none border border-transparent focus:border-pink-500/40 transition"
+                    />
+                    <button onClick={sendWord} disabled={!wordText.trim() || wordStatus === 'sending'}
+                      className="w-full mt-2 text-xs font-semibold py-1.5 rounded-lg text-pink-400 bg-black/20 active:scale-95 transition disabled:opacity-40">
+                      {wordStatus === 'sending' ? 'Отправляем...' : 'Отправить →'}
+                    </button>
+                    {wordStatus === 'error' && <p className="text-[10px] text-red-400 text-center mt-1">Ошибка, попробуйте позже</p>}
+                  </>
+              }
+            </div>
+          </motion.div>
+        )}
+      </AnimatePresence>
+    </div>
+  );
+};
+
 const AvatarMenu = ({ session, onLogout }) => {
   const [open, setOpen] = useState(false);
   const ref = useRef(null);
@@ -935,13 +1297,14 @@ const AvatarMenu = ({ session, onLogout }) => {
 };
 
 // ─── Календарь ─────────────────────────────────────────────────────────────────
-const CalendarSection = ({ subscriptions, fmt, fmtReal, monthly, month, year, onPrev, onNext }) => {
+const CalendarSection = ({ subscriptions, fmt, fmtReal, monthly, month, year, onPrev, onNext, calTotal, calYearly, isPast, calMonth }) => {
   const today       = new Date();
   const isToday     = (d) => d === today.getDate() && month === today.getMonth() && year === today.getFullYear();
   const daysInMonth = new Date(year, month + 1, 0).getDate();
   const offset      = (new Date(year, month, 1).getDay() + 6) % 7;
 
   const visibleSubs = subscriptions.filter(sub => {
+    if (sub.status === 'paused') return false; // паузные не показываем
     if (!sub.created_at && !sub.createdAt) return true;
     const c = new Date(sub.created_at ?? sub.createdAt);
     return c.getFullYear() < year || (c.getFullYear() === year && c.getMonth() <= month);
@@ -949,6 +1312,17 @@ const CalendarSection = ({ subscriptions, fmt, fmtReal, monthly, month, year, on
 
   const subsByDay = {};
   visibleSubs.forEach(sub => {
+    // Пробные — отображаем на дату окончания пробного периода
+    if (sub.status === 'trial') {
+      if (!sub.trial_end) return;
+      const end = new Date(sub.trial_end);
+      if (end.getFullYear() !== year || end.getMonth() !== month) return;
+      const d = end.getDate();
+      if (!subsByDay[d]) subsByDay[d] = [];
+      subsByDay[d].push(sub);
+      return;
+    }
+
     const d = sub.billingDay ?? extractBillingDay(sub.date);
     if (!d || d < 1 || d > daysInMonth) return;
 
@@ -983,21 +1357,39 @@ const CalendarSection = ({ subscriptions, fmt, fmtReal, monthly, month, year, on
           if (!day) return <div key={`e-${i}`} />;
           const daySubs = subsByDay[day] || [];
           const hasAny  = daySubs.length > 0;
-          const total   = daySubs.reduce((a, s) =>
-            a + (s.period === 'yearly' ? monthly(s) * 12 : monthly(s)), 0);
+          const hasActive = daySubs.some(s => !s.status || s.status === 'active');
+          const total   = daySubs
+            .filter(s => !s.status || s.status === 'active')
+            .reduce((a, s) => a + (s.period === 'yearly' ? monthly(s) * 12 : monthly(s)), 0);
           return (
             <div key={day} className={`relative aspect-square rounded-2xl flex flex-col items-center justify-center
               ${isToday(day) ? 'bg-white text-black' : hasAny ? 'bg-zinc-800 border border-zinc-700' : 'bg-zinc-900/40'}`}>
               <span className={`text-xs font-semibold leading-none ${isToday(day) ? 'text-black' : hasAny ? 'text-white' : 'text-zinc-600'}`}>{day}</span>
-              {hasAny && <span className={`text-[8px] font-bold mt-0.5 leading-none ${isToday(day) ? 'text-zinc-600' : 'text-amber-400'}`}>{fmt(total)}</span>}
+              {hasAny && hasActive && <span className={`text-[8px] font-bold mt-0.5 leading-none ${isToday(day) ? 'text-zinc-600' : 'text-amber-400'}`}>{fmt(total)}</span>}
               {hasAny && (
                 <div className="absolute -bottom-1 left-1/2 -translate-x-1/2 flex gap-0.5">
-                  {daySubs.slice(0, 3).map(s => <div key={s.id} className={`w-1 h-1 rounded-full ${s.period === 'yearly' ? 'bg-red-400' : 'bg-purple-400'}`} />)}
+                  {daySubs.slice(0, 3).map(s => (
+                    <div key={s.id} className={`w-1 h-1 rounded-full ${
+                      s.status === 'trial' ? 'bg-white' :
+                      s.period === 'yearly' ? 'bg-red-400' : 'bg-purple-400'
+                    }`} />
+                  ))}
                 </div>
               )}
             </div>
           );
         })}
+      </div>
+      {/* Суммы — сразу под сеткой */}
+      <div className="bg-[#1C1C1E] rounded-3xl border border-zinc-800/60 p-4 space-y-2">
+        <div className="flex justify-between text-sm">
+          <span className="text-zinc-400">{isPast ? `Потрачено в ${MONTHS_GENITIVE[calMonth ?? month]}` : `Ожидается в ${MONTHS_GENITIVE[calMonth ?? month]}`}</span>
+          <span className="font-semibold">{fmt(calTotal ?? 0)}</span>
+        </div>
+        <div className="flex justify-between text-sm">
+          <span className="text-zinc-400">В год</span>
+          <span className="font-semibold">{fmt(calYearly ?? 0)}</span>
+        </div>
       </div>
       {Object.keys(subsByDay).length > 0 && (
         <div className="bg-[#1C1C1E] rounded-3xl border border-zinc-800/60 divide-y divide-zinc-800/80 overflow-hidden mt-2">
@@ -1007,11 +1399,17 @@ const CalendarSection = ({ subscriptions, fmt, fmtReal, monthly, month, year, on
                 <div className="flex items-center gap-3 min-w-0">
                   <LogoIcon sub={sub} size="sm" />
                   <div className="min-w-0">
-                    <p className="text-sm font-medium truncate">{sub.name}</p>
+                    <div className="flex items-center gap-1.5">
+                      <p className="text-sm font-medium truncate">{sub.name}</p>
+                      {sub.status === 'trial' && <span className="text-[10px] font-semibold text-amber-400 bg-amber-500/10 border border-amber-500/30 px-1.5 py-0.5 rounded-lg shrink-0">пробный</span>}
+                    </div>
                     <p className="text-xs text-zinc-500">{day} {MONTHS_SHORT[month]}</p>
                   </div>
                 </div>
-                <p className="text-sm font-semibold shrink-0">{fmtReal(sub)}</p>
+                {sub.status === 'trial'
+                  ? <p className="text-xs text-zinc-500 shrink-0">не списывается</p>
+                  : <p className="text-sm font-semibold shrink-0">{fmtReal(sub)}</p>
+                }
               </div>
             ))
           )}
@@ -1143,16 +1541,19 @@ const SubscriptionRow = ({ sub, fmt, fmtOriginal, monthly, onEdit, onDelete }) =
           startRef.current = null;
           isVertical.current = false;
         }}
-        className="relative flex items-center px-4 py-3 gap-3 bg-[#1C1C1E]">
+        className={`relative flex items-center px-4 py-3 gap-3 bg-[#1C1C1E]`}>
         <LogoIcon sub={sub} size="sm" />
         <div className="min-w-0 flex-1">
           <div className="flex items-center gap-2">
             <p className="text-sm font-medium truncate">{sub.name}</p>
             {cat && <CategoryBadge cat={cat} tiny />}
+            {sub.status === 'paused' && <span className="text-[10px] font-semibold text-red-400 bg-red-500/10 border border-red-500/30 px-1.5 py-0.5 rounded-lg shrink-0">пауза</span>}
+            {sub.status === 'trial'  && <span className="text-[10px] font-semibold text-amber-400 bg-amber-500/10 border border-amber-500/30 px-1.5 py-0.5 rounded-lg shrink-0">пробный</span>}
           </div>
           <p className="text-xs text-zinc-500 truncate">
             {fmtOriginal(sub)} / {sub.period === 'yearly' ? 'год' : 'мес'}
             {sub.date && sub.date !== '—' && ` · ${sub.date}`}
+            {sub.status === 'trial' && sub.trial_end && ` · до ${new Date(sub.trial_end).toLocaleDateString('ru-RU', { day: 'numeric', month: 'short' })}`}
           </p>
         </div>
       </motion.div>
@@ -1189,6 +1590,102 @@ const CurrencySelector = ({ value, onChange }) => {
 };
 
 // ─── Модалка ───────────────────────────────────────────────────────────────────
+// ─── DatePicker ────────────────────────────────────────────────────────────────
+const DatePicker = ({ value, onChange, label }) => {
+  const [open, setOpen] = useState(false);
+  const today = new Date();
+  const parsed = value ? new Date(value) : null;
+  const [viewYear,  setViewYear]  = useState(parsed?.getFullYear()  ?? today.getFullYear());
+  const [viewMonth, setViewMonth] = useState(parsed?.getMonth()     ?? today.getMonth());
+  const ref = useRef(null);
+
+  useEffect(() => {
+    if (!open) return;
+    const handler = (e) => { if (ref.current && !ref.current.contains(e.target)) setOpen(false); };
+    document.addEventListener('mousedown', handler);
+    document.addEventListener('touchstart', handler);
+    return () => { document.removeEventListener('mousedown', handler); document.removeEventListener('touchstart', handler); };
+  }, [open]);
+
+  const daysInMonth = new Date(viewYear, viewMonth + 1, 0).getDate();
+  const offset = (new Date(viewYear, viewMonth, 1).getDay() + 6) % 7;
+  const cells = [...Array(offset).fill(null), ...Array.from({ length: daysInMonth }, (_, i) => i + 1)];
+
+  const selectDay = (d) => {
+    const mm = String(viewMonth + 1).padStart(2, '0');
+    const dd = String(d).padStart(2, '0');
+    onChange(`${viewYear}-${mm}-${dd}`);
+    setOpen(false);
+  };
+
+  const prevMonth = () => { if (viewMonth === 0) { setViewMonth(11); setViewYear(y => y - 1); } else setViewMonth(m => m - 1); };
+  const nextMonth = () => { if (viewMonth === 11) { setViewMonth(0);  setViewYear(y => y + 1); } else setViewMonth(m => m + 1); };
+
+  const selectedDay   = parsed?.getDate();
+  const selectedMonth = parsed?.getMonth();
+  const selectedYear  = parsed?.getFullYear();
+
+  return (
+    <div ref={ref} className="relative">
+      <div
+        onClick={() => setOpen(v => !v)}
+        className="flex items-center gap-3 bg-amber-500/10 border border-amber-500/30 rounded-2xl px-4 py-3 cursor-pointer active:bg-amber-500/20 transition">
+        <CalendarDays className="w-4 h-4 text-amber-400 shrink-0" />
+        <span className="text-xs text-amber-400 font-medium">{label}</span>
+        <span className="ml-auto text-sm">
+          {parsed
+            ? <span className="text-zinc-200">{parsed.toLocaleDateString('ru-RU', { day: 'numeric', month: 'long' })}</span>
+            : <span className="text-zinc-600">Выбрать дату</span>}
+        </span>
+      </div>
+      <AnimatePresence>
+        {open && (
+          <motion.div
+            initial={{ opacity: 0, y: -6, scale: 0.97 }}
+            animate={{ opacity: 1, y: 0, scale: 1 }}
+            exit={{ opacity: 0, y: -6, scale: 0.97 }}
+            transition={{ duration: 0.15 }}
+            className="absolute top-full mt-2 left-0 right-0 bg-zinc-900 border border-zinc-700 rounded-2xl shadow-2xl z-50 p-4">
+            {/* Навигация по месяцу */}
+            <div className="flex items-center justify-between mb-3">
+              <button type="button" onClick={prevMonth}
+                className="w-7 h-7 rounded-xl bg-zinc-800 border border-zinc-700 flex items-center justify-center text-zinc-400 active:scale-95 transition">
+                <ChevronDown className="w-3.5 h-3.5 rotate-90" />
+              </button>
+              <span className="text-sm font-semibold">{MONTHS_RU[viewMonth]} {viewYear}</span>
+              <button type="button" onClick={nextMonth}
+                className="w-7 h-7 rounded-xl bg-zinc-800 border border-zinc-700 flex items-center justify-center text-zinc-400 active:scale-95 transition">
+                <ChevronDown className="w-3.5 h-3.5 -rotate-90" />
+              </button>
+            </div>
+            {/* Дни недели */}
+            <div className="grid grid-cols-7 mb-1">
+              {DAYS_RU.map(d => <div key={d} className="text-center text-[10px] text-zinc-600 font-semibold uppercase py-1">{d}</div>)}
+            </div>
+            {/* Дни */}
+            <div className="grid grid-cols-7 gap-0.5">
+              {cells.map((day, i) => {
+                if (!day) return <div key={`e-${i}`} />;
+                const isSelected = day === selectedDay && viewMonth === selectedMonth && viewYear === selectedYear;
+                const isToday    = day === today.getDate() && viewMonth === today.getMonth() && viewYear === today.getFullYear();
+                return (
+                  <button key={day} type="button" onClick={() => selectDay(day)}
+                    className={`aspect-square rounded-xl text-xs font-medium transition active:scale-95
+                      ${isSelected ? 'bg-amber-500 text-black font-bold'
+                        : isToday   ? 'bg-zinc-700 text-white'
+                        : 'text-zinc-300 hover:bg-zinc-800'}`}>
+                    {day}
+                  </button>
+                );
+              })}
+            </div>
+          </motion.div>
+        )}
+      </AnimatePresence>
+    </div>
+  );
+};
+
 const SubModal = ({ initial, currency, onSave, onClose }) => {
   // Валюта модалки: при редактировании — оригинальная валюта подписки, при добавлении — текущая глобальная
   const [modalCurrency, setModalCurrency] = useState(initial?.currency_code || currency);
@@ -1196,8 +1693,10 @@ const SubModal = ({ initial, currency, onSave, onClose }) => {
 
   const [name,     setName]     = useState(initial?.name     || '');
   const [price,    setPrice]    = useState(initial ? String(initial.price ?? initial.price_usd ?? '') : '');
-  const [period,   setPeriod]   = useState(initial?.period   || 'monthly');
-  const [category, setCategory] = useState(initial?.category || '');
+  const [period,    setPeriod]   = useState(initial?.period   || 'monthly');
+  const [category,  setCategory] = useState(initial?.category || '');
+  const [status,    setStatus]   = useState(initial?.status   || 'active');
+  const [trialEnd,  setTrialEnd] = useState(initial?.trial_end || '');
   const [day,      setDay]      = useState(() => { const d = extractBillingDay(initial?.date); return d ? String(d) : ''; });
   const [month,    setMonth]    = useState(() => { if (!initial?.date) return ''; return String(initial.date).trim().split(' ')[1] || ''; });
   const [suggestions,     setSuggestions]     = useState([]);
@@ -1231,7 +1730,7 @@ const SubModal = ({ initial, currency, onSave, onClose }) => {
     if (!canSave) return;
     const dateStr = day && month ? `${day} ${month}` : day || '—';
     // Сохраняем цену в оригинальной валюте — никакой конвертации
-    onSave({ name: name.trim(), price: Number(price), currencyCode: modalCurrency, period, category, date: dateStr, logo: initial?.logo || '' });
+    onSave({ name: name.trim(), price: Number(price), currencyCode: modalCurrency, period, category, date: dateStr, logo: initial?.logo || '', status, trial_end: status === 'trial' && trialEnd ? trialEnd : null });
   };
 
   return (
@@ -1300,20 +1799,56 @@ const SubModal = ({ initial, currency, onSave, onClose }) => {
           {/* Периодичность */}
           <div className="flex gap-2">
             {['monthly', 'yearly'].map(p => (
-              <button key={p} type="button" onClick={() => setPeriod(p)}
+              <button key={p} type="button" onClick={() => { setPeriod(p); if (p === 'monthly') setMonth(''); }}
                 className={`flex-1 py-3 rounded-2xl text-sm font-medium border transition ${period === p ? 'bg-white text-black border-white' : 'bg-black border-zinc-800 text-zinc-400'}`}>
                 {p === 'monthly' ? 'В месяц' : 'В год'}
               </button>
             ))}
           </div>
 
-          {/* Дата */}
+          {/* Статус */}
           <div className="flex gap-2">
-            <input type="number" inputMode="numeric" placeholder="День" min="1" max="31"
-              className="flex-1 bg-black border border-zinc-800 rounded-2xl px-4 py-3 text-sm focus:outline-none focus:border-zinc-500 transition"
-              value={day} onChange={e => { const v = e.target.value; if (v === '' || (Number(v) >= 1 && Number(v) <= 31)) setDay(v); }} />
-            <div className="flex-1"><MonthPicker value={month} onChange={setMonth} /></div>
+            {[
+              { id: 'active', label: 'Активна',    color: 'text-green-400',  bg: 'bg-green-500/15',  border: 'border-green-500/40'  },
+              { id: 'paused', label: 'На паузе',   color: 'text-red-400',    bg: 'bg-red-500/15',    border: 'border-red-500/40'    },
+              { id: 'trial',  label: 'Пробный',    color: 'text-amber-400',  bg: 'bg-amber-500/15',  border: 'border-amber-500/40'  },
+            ].map(s => (
+              <button key={s.id} type="button" onClick={() => setStatus(s.id)}
+                className={`flex-1 py-2.5 rounded-2xl text-xs font-semibold border transition ${status === s.id ? `${s.bg} ${s.border} ${s.color}` : 'bg-black border-zinc-800 text-zinc-500'}`}>
+                {s.label}
+              </button>
+            ))}
           </div>
+
+          {/* Дата окончания пробного */}
+          {status === 'trial' && (
+            <DatePicker
+              value={trialEnd}
+              onChange={setTrialEnd}
+              label="Окончание пробного периода"
+            />
+          )}
+
+          {/* Дата списания — скрыта для пробных (дата = trial_end) */}
+          {status !== 'trial' && (
+          <div className="space-y-1.5">
+            {initial && (
+              <p className="text-[11px] text-zinc-500 px-1">
+                {period === 'yearly' ? 'Дата списания' : 'Число списания'}
+              </p>
+            )}
+            <div className="flex gap-2">
+              <input type="number" inputMode="numeric"
+                placeholder={period === 'yearly' ? 'День' : 'День списания'}
+                min="1" max="31"
+                className={`${period === 'yearly' ? 'flex-1' : 'w-full'} bg-black border border-zinc-800 rounded-2xl px-4 py-3 text-sm focus:outline-none focus:border-zinc-500 transition`}
+                value={day} onChange={e => { const v = e.target.value; if (v === '' || (Number(v) >= 1 && Number(v) <= 31)) setDay(v); }} />
+              {period === 'yearly' && (
+                <div className="flex-1"><MonthPicker value={month} onChange={setMonth} /></div>
+              )}
+            </div>
+          </div>
+          )}
 
           {/* Категория */}
           <div className="flex flex-wrap gap-2">
