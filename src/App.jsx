@@ -8,6 +8,7 @@ import {
   Wifi, Globe, Phone, Server, Tv, MonitorSmartphone, Package, Wallet, MessageCircle, Download, Bell
 } from 'lucide-react';
 import { supabase } from './lib/supabase';
+import { analytics } from './lib/analytics';
 import Auth from './Auth';
 
 // ─── Категории ─────────────────────────────────────────────────────────────────
@@ -339,6 +340,7 @@ const App = ({ session }) => {
         updated_at: new Date().toISOString(),
       }, { onConflict: 'user_id' });
       setPushBanner(false);
+      analytics.pushEnabled();
     } catch (e) {
       console.error('Push subscribe error:', e);
       setPushBanner(false);
@@ -348,6 +350,7 @@ const App = ({ session }) => {
   const dismissPushBanner = () => {
     localStorage.setItem('pushBannerDismissed', '1');
     setPushBanner(false);
+    analytics.pushDismissed();
   };
 
   const curr = getCurrency(currency);
@@ -383,6 +386,7 @@ const App = ({ session }) => {
 
   const switchTab = (tab) => {
     setActiveTab(tab);
+    analytics.tabSwitched(tab);
   };
 
   // Сбрасываем скролл вкладки при каждом переключении на неё
@@ -395,6 +399,7 @@ const App = ({ session }) => {
   // ── Загрузка подписок из Supabase ──────────────────────────────────────────
   useEffect(() => {
     setLoading(true);
+    analytics.identify(userId, session.user.email);
     supabase
       .from('subscriptions')
       .select('*')
@@ -475,12 +480,14 @@ const App = ({ session }) => {
         setSubscriptions(prev => prev.map(s =>
           s.id === editingSub.id ? { ...data, billingDay: extractBillingDay(data.date) } : s
         ));
+        analytics.subscriptionEdited(payload.name, payload.category);
       }
     } else {
       const { data, error } = await supabase
         .from('subscriptions').insert({ ...row, created_at: new Date().toISOString() }).select().single();
       if (!error && data) {
         setSubscriptions(prev => [...prev, { ...data, billingDay: extractBillingDay(data.date) }]);
+        analytics.subscriptionAdded(payload.name, payload.category, payload.period, payload.currencyCode);
       }
     }
     setIsModalOpen(false); setEditingSub(null);
@@ -489,6 +496,7 @@ const App = ({ session }) => {
   const triggerDelete = async (sub) => {
     setSubscriptions(prev => prev.filter(s => s.id !== sub.id));
     await supabase.from('subscriptions').delete().eq('id', sub.id);
+    analytics.subscriptionDeleted(sub.name, sub.category);
     if (toast?.timeoutId) clearTimeout(toast.timeoutId);
     const timeoutId = window.setTimeout(async () => {
       setToast(null);
@@ -500,10 +508,11 @@ const App = ({ session }) => {
     if (!toast) return;
     clearTimeout(toast.timeoutId);
     const sub = toast.sub;
-    const { id, billingDay, ...row } = sub; // убираем id и billingDay — Supabase сам назначит новый id
+    const { id, billingDay, ...row } = sub;
     const { data, error } = await supabase.from('subscriptions').insert({ ...row, user_id: userId }).select().single();
     if (!error && data) {
       setSubscriptions(prev => [{ ...data, billingDay: extractBillingDay(data.date) }, ...prev]);
+      analytics.subscriptionDeleteUndone();
     }
     setToast(null);
   };
@@ -529,7 +538,7 @@ const App = ({ session }) => {
     total: activeSubs.filter(s => s.category === cat.id).reduce((a, s) => a + monthly(s), 0),
   })).filter(c => c.subs.length > 0);
 
-  const handleLogout = () => supabase.auth.signOut();
+  const handleLogout = () => { analytics.loggedOut(); supabase.auth.signOut(); };
 
   if (loading) return (
     <div className="min-h-screen bg-black flex items-center justify-center">
@@ -585,7 +594,7 @@ const App = ({ session }) => {
                 <p className="text-zinc-500 uppercase text-[10px] tracking-[0.22em] font-semibold mb-2">В месяц</p>
                 <h2 className="text-6xl font-bold tracking-tighter mb-3">{fmt(totalMonthlyUSD)}</h2>
                 <div className="flex items-center justify-center gap-2">
-                  <CurrencySelector value={currency} onChange={setCurrency} />
+                  <CurrencySelector value={currency} onChange={(c) => { setCurrency(c); analytics.currencyChanged(c); }} />
                   <button onClick={() => { setRatesLoading(true); fetchRates().then(r => { if (r) setRates(r); setRatesLoading(false); }); }}
                     className="w-7 h-7 flex items-center justify-center rounded-full bg-zinc-800/70 border border-zinc-700 text-zinc-400 hover:text-zinc-200 transition active:scale-95">
                     <RefreshCw className={`w-3 h-3 ${ratesLoading ? 'animate-spin' : ''}`} />
@@ -639,40 +648,70 @@ const App = ({ session }) => {
 
               <SoonSection soonSubs={soonSubs} fmt={fmt} fmtOriginal={fmtOriginal} monthly={monthly} />
 
-              <section className="space-y-3">
-                <div className="flex items-center justify-between px-1">
-                  <SectionTitle icon={List} label="Все подписки" />
-                  <button onClick={cycleSortBy} className="flex items-center gap-1 text-[10px] text-zinc-500 hover:text-zinc-300 transition font-semibold uppercase tracking-wide">
-                    <ArrowUpDown className="w-3 h-3" />{sortLabel}
+              {subscriptions.length === 0 ? (
+                /* ── Empty state ── */
+                <motion.div
+                  initial={{ opacity: 0, y: 12 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  transition={{ duration: 0.35, ease: 'easeOut' }}
+                  className="flex flex-col items-center text-center px-6 py-10 space-y-5">
+                  <div className="relative">
+                    <div className="w-24 h-24 rounded-[32px] bg-zinc-900 border border-zinc-800 flex items-center justify-center">
+                      <CreditCard className="w-10 h-10 text-zinc-700" />
+                    </div>
+                    <div className="absolute -bottom-1 -right-1 w-8 h-8 rounded-2xl bg-zinc-900 border border-zinc-800 flex items-center justify-center">
+                      <Plus className="w-4 h-4 text-zinc-600" />
+                    </div>
+                  </div>
+                  <div className="space-y-2">
+                    <p className="text-lg font-semibold tracking-tight">Пока тут пусто</p>
+                    <p className="text-sm text-zinc-500 leading-relaxed max-w-[260px]">
+                      Самое время вспомнить, за что платишь каждый месяц
+                    </p>
+                  </div>
+                  <button onClick={openAdd}
+                    className="flex items-center gap-2 bg-white text-black font-semibold text-sm rounded-2xl px-6 py-3 active:scale-95 transition shadow-lg">
+                    <Plus className="w-4 h-4" />
+                    Добавить первую подписку
                   </button>
-                </div>
-                <div className="relative px-1">
-                  <Search className="absolute left-4 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-zinc-600 pointer-events-none" />
-                  <input value={searchQuery} onChange={e => setSearchQuery(e.target.value)} placeholder="Поиск..."
-                    className="w-full bg-zinc-900/60 border border-zinc-800 rounded-2xl pl-9 pr-9 py-2.5 text-sm focus:outline-none focus:border-zinc-600 transition text-zinc-200 placeholder:text-zinc-600" />
-                  {searchQuery && (
-                    <button onClick={() => setSearchQuery('')} className="absolute right-4 top-1/2 -translate-y-1/2 text-zinc-600 hover:text-zinc-400 transition">
-                      <X className="w-3.5 h-3.5" />
+                </motion.div>
+              ) : (
+                <section className="space-y-3">
+                  <div className="flex items-center justify-between px-1">
+                    <SectionTitle icon={List} label="Все подписки" />
+                    <button onClick={cycleSortBy} className="flex items-center gap-1 text-[10px] text-zinc-500 hover:text-zinc-300 transition font-semibold uppercase tracking-wide">
+                      <ArrowUpDown className="w-3 h-3" />{sortLabel}
                     </button>
-                  )}
-                </div>
-                <div className="bg-[#1C1C1E] rounded-3xl border border-zinc-800/60 divide-y divide-zinc-800/80 overflow-hidden">
-                  {!swipeHinted && sortedSubs.length > 0 && (
-                    <div className="px-4 py-2 text-[10px] text-zinc-600 text-center tracking-wide">
-                      ← свайп для удаления · свайп для редактирования →
-                    </div>
-                  )}
-                  {sortedSubs.map(sub => (
-                    <SubscriptionRow key={sub.id} sub={sub} fmt={fmt} fmtOriginal={fmtOriginal} monthly={monthly}
-                      onEdit={() => openEdit(sub)} onDelete={() => triggerDelete(sub)} />
-                  ))}
-                  {sortedSubs.length === 0 && (
-                    <div className="px-4 py-5 text-sm text-zinc-500">
-                      {searchQuery ? 'Ничего не найдено' : 'Нажмите «Добавить подписку», чтобы начать.'}
-                    </div>
-                  )}
-                </div>
-              </section>
+                  </div>
+                  <div className="relative px-1">
+                    <Search className="absolute left-4 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-zinc-600 pointer-events-none" />
+                    <input value={searchQuery} onChange={e => setSearchQuery(e.target.value)} placeholder="Поиск..."
+                      className="w-full bg-zinc-900/60 border border-zinc-800 rounded-2xl pl-9 pr-9 py-2.5 text-sm focus:outline-none focus:border-zinc-600 transition text-zinc-200 placeholder:text-zinc-600" />
+                    {searchQuery && (
+                      <button onClick={() => setSearchQuery('')} className="absolute right-4 top-1/2 -translate-y-1/2 text-zinc-600 hover:text-zinc-400 transition">
+                        <X className="w-3.5 h-3.5" />
+                      </button>
+                    )}
+                  </div>
+                  <div className="bg-[#1C1C1E] rounded-3xl border border-zinc-800/60 divide-y divide-zinc-800/80 overflow-hidden">
+                    {!swipeHinted && sortedSubs.length > 0 && (
+                      <div className="px-4 py-2 text-[10px] text-zinc-600 text-center tracking-wide">
+                        ← свайп для удаления · свайп для редактирования →
+                      </div>
+                    )}
+                    {sortedSubs.map(sub => (
+                      <SubscriptionRow key={sub.id} sub={sub} fmt={fmt} fmtOriginal={fmtOriginal} monthly={monthly}
+                        onEdit={() => openEdit(sub)} onDelete={() => triggerDelete(sub)} />
+                    ))}
+                    {sortedSubs.length === 0 && searchQuery && (
+                      <div className="flex flex-col items-center gap-2 px-4 py-8 text-center">
+                        <Search className="w-6 h-6 text-zinc-700" />
+                        <p className="text-sm text-zinc-500">Ничего не найдено по «{searchQuery}»</p>
+                      </div>
+                    )}
+                  </div>
+                </section>
+              )}
             </div>
           </div>
 
@@ -929,7 +968,7 @@ const ONBOARDING_STEPS = [
     iconColor: 'text-black',
     iconBg: 'bg-white',
     title: 'Добавляй подписки',
-    subtitle: 'Нажми кнопку + в правом верхнем углу. Введи название — приложение само подскажет сервис и подставит категорию. Укажи сумму и дату списания.',
+    subtitle: 'Нажми «Добавить подписку». Введи название — приложение само подскажет сервис и подставит категорию. Укажи сумму и дату списания.',
   },
   {
     type: 'swipe',
@@ -1108,7 +1147,7 @@ const Onboarding = ({ onDone }) => {
             {isLast ? 'Начать' : 'Далее'}
           </button>
           {!isLast && (
-            <button onClick={onDone} className="w-full text-zinc-500 text-sm py-2">Пропустить</button>
+            <button onClick={() => onDone(step)} className="w-full text-zinc-500 text-sm py-2">Пропустить</button>
           )}
         </div>
       </div>
@@ -1304,10 +1343,8 @@ const CalendarSection = ({ subscriptions, fmt, fmtReal, monthly, month, year, on
   const offset      = (new Date(year, month, 1).getDay() + 6) % 7;
 
   const visibleSubs = subscriptions.filter(sub => {
-    if (sub.status === 'paused') return false; // паузные не показываем
-    if (!sub.created_at && !sub.createdAt) return true;
-    const c = new Date(sub.created_at ?? sub.createdAt);
-    return c.getFullYear() < year || (c.getFullYear() === year && c.getMonth() <= month);
+    if (sub.status === 'paused') return false;
+    return true;
   });
 
   const subsByDay = {};
@@ -1963,7 +2000,12 @@ export default function Root() {
     </div>
   );
 
-  if (!onboarded) return <Onboarding onDone={() => { setOnboarded(true); localStorage.setItem('onboarded', '1'); }} />;
+  if (!onboarded) return <Onboarding onDone={(skippedAt) => {
+    if (skippedAt !== undefined) analytics.onboardingSkipped(skippedAt);
+    else analytics.onboardingCompleted();
+    setOnboarded(true);
+    localStorage.setItem('onboarded', '1');
+  }} />;
   if (!session)   return <Auth />;
   return <App session={session} />;
 }
