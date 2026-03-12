@@ -19,6 +19,11 @@ body::-webkit-scrollbar { display: none; } /* Chrome/Safari */
   display: none;
 }
 
+/* iOS: font-size < 16px вызывает автозум при фокусе на инпут — фиксируем */
+input, textarea, select {
+  font-size: 16px !important;
+}
+
 /* Без стрелочек у numeric-input, но с цифровой клавиатурой */
 input[type="number"]::-webkit-inner-spin-button,
 input[type="number"]::-webkit-outer-spin-button {
@@ -50,17 +55,14 @@ input[type="number"] {
 
 /* Анимация прогресс-бара тоста (5 секунд) */
 @keyframes toast-progress {
-  from {
-    width: 100%;
-  }
-  to {
-    width: 0%;
-  }
+  from { width: 100%; }
+  to   { width: 0%; }
 }
 
 .animate-toast-progress {
   animation: toast-progress 5s linear forwards;
 }
+
 /* Блокируем iOS 18 PWA back/forward gesture */
 html, body {
   overscroll-behavior: none;

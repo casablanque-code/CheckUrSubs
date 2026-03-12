@@ -1,23 +1,43 @@
-<!doctype html>
+<!DOCTYPE html>
 <html lang="ru">
   <head>
     <meta charset="UTF-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover, user-scalable=no" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no, viewport-fit=cover" />
+
+    <!-- ── Primary ── -->
     <title>CheckUrSubs</title>
+    <meta name="description" content="Track every subscription. Know exactly what you pay." />
+    <meta name="theme-color" content="#080808" />
 
-    <meta name="description" content="Лаконичное PWA-приложение для учета подписок и сервисов." />
-    <meta name="theme-color" content="#000000" />
+    <!-- ── PWA manifest ── -->
+    <link rel="manifest" href="/manifest.webmanifest" />
 
-    <link rel="icon" type="image/svg+xml" href="/icon-192.svg" />
-    <link rel="apple-touch-icon" href="/icon-192.svg" />
+    <!-- ── Favicon ── -->
+    <link rel="icon" href="/favicon.svg" type="image/svg+xml" />
 
+    <!-- ── iOS / Apple ── -->
+    <meta name="mobile-web-app-capable" content="yes" />
     <meta name="apple-mobile-web-app-capable" content="yes" />
     <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
     <meta name="apple-mobile-web-app-title" content="CheckUrSubs" />
+    <link rel="apple-touch-icon" href="/apple-touch-icon.svg" />
 
-    <link rel="manifest" href="/manifest.webmanifest" />
+    <!-- ── Apple Splash Screens (опционально, но хорошо для UX) ── -->
+    <!-- можно добавить позже через https://progressier.com/pwa-screenshots -->
+
+    <!-- ── OG / Social ── -->
+    <meta property="og:type" content="website" />
+    <meta property="og:title" content="CheckUrSubs" />
+    <meta property="og:description" content="Track every subscription. Know exactly what you pay." />
+    <meta property="og:url" content="https://checkursubs.vercel.app" />
+    <meta property="og:image" content="https://checkursubs.vercel.app/og-image.png" />
+
+    <meta name="twitter:card" content="summary_large_image" />
+    <meta name="twitter:title" content="CheckUrSubs" />
+    <meta name="twitter:description" content="Track every subscription. Know exactly what you pay." />
+    <meta name="twitter:image" content="https://checkursubs.vercel.app/og-image.png" />
   </head>
-  <body class="bg-black text-white">
+  <body>
     <div id="root"></div>
     <script type="module" src="/src/main.jsx"></script>
   </body>

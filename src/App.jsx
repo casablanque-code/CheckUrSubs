@@ -9,20 +9,23 @@ import {
 } from 'lucide-react';
 import { supabase } from './lib/supabase';
 import { analytics } from './lib/analytics';
+import { translations, LangContext, useLang, useT } from './lib/i18n';
 import Auth from './Auth';
+
 
 // ─── Категории ─────────────────────────────────────────────────────────────────
 const CATEGORIES = [
-  { id: 'entertainment', label: 'Развлечения', icon: Music,     color: 'text-pink-400',   bg: 'bg-pink-500/15',   border: 'border-pink-500/30',   bar: 'bg-pink-500'   },
-  { id: 'work',          label: 'Работа',      icon: Briefcase, color: 'text-blue-400',   bg: 'bg-blue-500/15',   border: 'border-blue-500/30',   bar: 'bg-blue-500'   },
-  { id: 'internet',      label: 'Интернет',    icon: Globe,     color: 'text-sky-400',    bg: 'bg-sky-500/15',    border: 'border-sky-500/30',    bar: 'bg-sky-500'    },
-  { id: 'games',         label: 'Игры',        icon: Gamepad2,  color: 'text-green-400',  bg: 'bg-green-500/15',  border: 'border-green-500/30',  bar: 'bg-green-500'  },
-  { id: 'education',     label: 'Обучение',    icon: BookOpen,  color: 'text-amber-400',  bg: 'bg-amber-500/15',  border: 'border-amber-500/30',  bar: 'bg-amber-500'  },
-  { id: 'vpn',           label: 'VPN',         icon: Shield,    color: 'text-violet-400', bg: 'bg-violet-500/15', border: 'border-violet-500/30', bar: 'bg-violet-500' },
-  { id: 'health',        label: 'Здоровье',    icon: Heart,     color: 'text-rose-400',   bg: 'bg-rose-500/15',   border: 'border-rose-500/30',   bar: 'bg-rose-500'   },
-  { id: 'banking',       label: 'Банкинг',     icon: Wallet,    color: 'text-emerald-400',bg: 'bg-emerald-500/15',border: 'border-emerald-500/30',bar: 'bg-emerald-500'},
-  { id: 'telecom',       label: 'Связь',       icon: Phone,     color: 'text-cyan-400',   bg: 'bg-cyan-500/15',   border: 'border-cyan-500/30',   bar: 'bg-cyan-500'   },
-  { id: 'other',         label: 'Другое',      icon: Zap,       color: 'text-zinc-400',   bg: 'bg-zinc-500/15',   border: 'border-zinc-500/30',   bar: 'bg-zinc-500'   },
+  { id: 'entertainment', labelKey: 'cat_entertainment', icon: Music,     color: 'text-pink-400',   bg: 'bg-pink-500/15',   border: 'border-pink-500/30',   bar: 'bg-pink-500'   },
+  { id: 'work',          labelKey: 'cat_work',          icon: Briefcase, color: 'text-blue-400',   bg: 'bg-blue-500/15',   border: 'border-blue-500/30',   bar: 'bg-blue-500'   },
+  { id: 'internet',      labelKey: 'cat_internet',      icon: Globe,     color: 'text-sky-400',    bg: 'bg-sky-500/15',    border: 'border-sky-500/30',    bar: 'bg-sky-500'    },
+  { id: 'games',         labelKey: 'cat_games',         icon: Gamepad2,  color: 'text-green-400',  bg: 'bg-green-500/15',  border: 'border-green-500/30',  bar: 'bg-green-500'  },
+  { id: 'education',     labelKey: 'cat_education',     icon: BookOpen,  color: 'text-amber-400',  bg: 'bg-amber-500/15',  border: 'border-amber-500/30',  bar: 'bg-amber-500'  },
+  { id: 'vpn',           labelKey: 'cat_vpn',           icon: Shield,    color: 'text-violet-400', bg: 'bg-violet-500/15', border: 'border-violet-500/30', bar: 'bg-violet-500' },
+  { id: 'health',        labelKey: 'cat_health',        icon: Heart,     color: 'text-rose-400',   bg: 'bg-rose-500/15',   border: 'border-rose-500/30',   bar: 'bg-rose-500'   },
+  { id: 'banking',       labelKey: 'cat_banking',       icon: Wallet,    color: 'text-emerald-400',bg: 'bg-emerald-500/15',border: 'border-emerald-500/30',bar: 'bg-emerald-500'},
+  { id: 'telecom',       labelKey: 'cat_telecom',       icon: Phone,     color: 'text-cyan-400',   bg: 'bg-cyan-500/15',   border: 'border-cyan-500/30',   bar: 'bg-cyan-500'   },
+  { id: 'ai',            labelKey: 'cat_ai',            icon: Sparkles,  color: 'text-purple-400', bg: 'bg-purple-500/15', border: 'border-purple-500/30', bar: 'bg-purple-500' },
+  { id: 'other',         labelKey: 'cat_other',         icon: Zap,       color: 'text-zinc-400',   bg: 'bg-zinc-500/15',   border: 'border-zinc-500/30',   bar: 'bg-zinc-500'   },
 ];
 const getCat = (id) => CATEGORIES.find(c => c.id === id) || null;
 
@@ -38,9 +41,11 @@ const DEFAULT_RATES = { USD: 1, EUR: 0.92, RUB: 90, GBP: 0.79 };
 
 const fetchRates = async () => {
   try {
-    const res  = await fetch('https://api.frankfurter.app/latest?base=USD&symbols=EUR,RUB,GBP');
+    const res  = await fetch('https://open.er-api.com/v6/latest/USD');
     const data = await res.json();
-    const rates = { USD: 1, ...data.rates };
+    if (data.result !== 'success') return null;
+    const { USD, EUR, RUB, GBP } = data.rates;
+    const rates = { USD: 1, EUR, RUB, GBP };
     localStorage.setItem('fxRates',   JSON.stringify(rates));
     localStorage.setItem('fxRatesAt', Date.now().toString());
     return rates;
@@ -292,18 +297,30 @@ const urlBase64ToUint8Array = (base64String) => {
 // ═══════════════════════════════════════════════════════════════════════════════
 // APP
 // ═══════════════════════════════════════════════════════════════════════════════
-const App = ({ session }) => {
+const App = ({ session, toggleLang, lang }) => {
   const userId = session.user.id;
+  const t = useT();
 
   const [subscriptions, setSubscriptions] = useState([]);
   const [loading,       setLoading]       = useState(true);
 
-  const [currency,     setCurrency]     = useState(() => localStorage.getItem('currency') || 'USD');
+  const [currency,     setCurrency]     = useState(() => {
+    const saved = localStorage.getItem('currency');
+    if (saved) return saved;
+    return lang === 'ru' ? 'RUB' : 'USD';
+  });
   const [rates,        setRates]        = useState(() => loadRates() || DEFAULT_RATES);
   const [ratesLoading, setRatesLoading] = useState(false);
   const [activeTab,    setActiveTab]    = useState('home');
   const [isModalOpen,  setIsModalOpen]  = useState(false);
   const [editingSub,   setEditingSub]   = useState(null);
+
+  // При смене языка — менять валюту на дефолт, если юзер не выбирал вручную
+  useEffect(() => {
+    if (!localStorage.getItem('currencyManual')) {
+      setCurrency(lang === 'ru' ? 'RUB' : 'USD');
+    }
+  }, [lang]);
   const [toast,        setToast]        = useState(null);
   const [sortBy,       setSortBy]       = useState('name');
   const [searchQuery,  setSearchQuery]  = useState('');
@@ -419,7 +436,11 @@ const App = ({ session }) => {
     if (!cached) { setRatesLoading(true); fetchRates().then(r => { if (r) setRates(r); setRatesLoading(false); }); }
   }, []);
 
-  useEffect(() => { localStorage.setItem('currency', currency); }, [currency]);
+  useEffect(() => {
+    if (localStorage.getItem('currencyManual')) {
+      localStorage.setItem('currency', currency);
+    }
+  }, [currency]);
 
   useEffect(() => {
     if (!swipeHinted && subscriptions.length > 0) {
@@ -529,7 +550,7 @@ const App = ({ session }) => {
       return a.name.localeCompare(b.name);
     });
 
-  const sortLabel   = sortBy === 'name' ? 'А–Я' : sortBy === 'price' ? 'Цена' : 'Дата';
+  const sortLabel   = sortBy === 'name' ? t.sort_az : sortBy === 'price' ? t.sort_price : t.sort_date;
   const cycleSortBy = () => setSortBy(p => p === 'name' ? 'price' : p === 'price' ? 'date' : 'name');
 
   const byCategory = CATEGORIES.map(cat => ({
@@ -558,9 +579,23 @@ const App = ({ session }) => {
             <div className="p-4 space-y-5">
               <header className="relative flex items-center justify-between px-1 pt-2">
                 <SupportMenu />
-                <h1 className="absolute left-1/2 -translate-x-1/2 text-lg font-semibold tracking-tight whitespace-nowrap">Подписки</h1>
-                {/* Аватар с дропдауном */}
-                <AvatarMenu session={session} onLogout={handleLogout} />
+                <h1 className="absolute left-1/2 -translate-x-1/2 text-lg font-semibold tracking-tight whitespace-nowrap">CheckUrSubs</h1>
+                <div className="flex items-center gap-2">
+                  {/* Переключатель языка — тогл */}
+                  <button onClick={toggleLang}
+                    className="relative flex items-center h-7 w-[64px] rounded-full border border-zinc-700 bg-zinc-900 p-0.5 transition-all active:scale-95">
+                    {/* Ползунок */}
+                    <motion.div
+                      animate={{ x: lang === 'en' ? 32 : 0 }}
+                      transition={{ type: 'spring', stiffness: 400, damping: 30 }}
+                      className="absolute w-[28px] h-[22px] rounded-full bg-white shadow-sm"
+                    />
+                    {/* Лейблы */}
+                    <span className={`relative z-10 flex-1 text-center text-[10px] font-bold tracking-wide transition-colors ${lang === 'ru' ? 'text-black' : 'text-zinc-500'}`}>RU</span>
+                    <span className={`relative z-10 flex-1 text-center text-[10px] font-bold tracking-wide transition-colors ${lang === 'en' ? 'text-black' : 'text-zinc-500'}`}>EN</span>
+                  </button>
+                  <AvatarMenu session={session} onLogout={handleLogout} />
+                </div>
               </header>
 
               {/* Push-баннер */}
@@ -576,12 +611,12 @@ const App = ({ session }) => {
                       <Bell className="w-4 h-4 text-violet-400" />
                     </div>
                     <div className="flex-1 min-w-0">
-                      <p className="text-sm font-medium leading-tight">Напоминания о платежах</p>
-                      <p className="text-xs text-zinc-500 mt-0.5">Уведомим за 3 дня до списания</p>
+                      <p className="text-sm font-medium leading-tight">{t.push_title}</p>
+                      <p className="text-xs text-zinc-500 mt-0.5">{t.push_subtitle}</p>
                     </div>
                     <button onClick={subscribePush}
                       className="text-xs font-semibold text-violet-400 bg-violet-500/15 border border-violet-500/30 px-3 py-1.5 rounded-xl shrink-0 active:scale-95 transition">
-                      Включить
+                      {t.push_enable}
                     </button>
                     <button onClick={dismissPushBanner} className="text-zinc-600 hover:text-zinc-400 transition shrink-0">
                       <X className="w-4 h-4" />
@@ -591,10 +626,10 @@ const App = ({ session }) => {
               </AnimatePresence>
 
               <section className="bg-gradient-to-b from-zinc-800/40 to-zinc-900/20 border border-zinc-800 rounded-[40px] p-6 text-center shadow-2xl">
-                <p className="text-zinc-500 uppercase text-[10px] tracking-[0.22em] font-semibold mb-2">В месяц</p>
+                <p className="text-zinc-500 uppercase text-[10px] tracking-[0.22em] font-semibold mb-2">{t.per_month}</p>
                 <h2 className="text-6xl font-bold tracking-tighter mb-3">{fmt(totalMonthlyUSD)}</h2>
                 <div className="flex items-center justify-center gap-2">
-                  <CurrencySelector value={currency} onChange={(c) => { setCurrency(c); analytics.currencyChanged(c); }} />
+                  <CurrencySelector value={currency} onChange={(c) => { setCurrency(c); localStorage.setItem('currencyManual', '1'); analytics.currencyChanged(c); }} />
                   <button onClick={() => { setRatesLoading(true); fetchRates().then(r => { if (r) setRates(r); setRatesLoading(false); }); }}
                     className="w-7 h-7 flex items-center justify-center rounded-full bg-zinc-800/70 border border-zinc-700 text-zinc-400 hover:text-zinc-200 transition active:scale-95">
                     <RefreshCw className={`w-3 h-3 ${ratesLoading ? 'animate-spin' : ''}`} />
@@ -608,18 +643,18 @@ const App = ({ session }) => {
                     return <>
                       <div className="inline-flex items-center gap-2 bg-green-500/10 text-green-400 px-4 py-1.5 rounded-full text-xs font-semibold uppercase tracking-[0.16em]">
                         <span className="w-1.5 h-1.5 rounded-full bg-green-400 animate-pulse" />
-                        {active} активных
+                        {t.active_count(active)}
                       </div>
                       {paused > 0 && (
                         <div className="inline-flex items-center gap-2 bg-red-500/10 text-red-400 px-4 py-1.5 rounded-full text-xs font-semibold uppercase tracking-[0.16em]">
                           <span className="w-1.5 h-1.5 rounded-full bg-red-400" />
-                          {paused} на паузе
+                          {t.paused_count(paused)}
                         </div>
                       )}
                       {trial > 0 && (
                         <div className="inline-flex items-center gap-2 bg-amber-500/10 text-amber-400 px-4 py-1.5 rounded-full text-xs font-semibold uppercase tracking-[0.16em]">
                           <span className="w-1.5 h-1.5 rounded-full bg-amber-400 animate-pulse" />
-                          {trial} пробных
+                          {t.trial_count(trial)}
                         </div>
                       )}
                     </>;
@@ -628,11 +663,11 @@ const App = ({ session }) => {
                 <div className="grid grid-cols-2 mt-5 text-left border-t border-zinc-800/60 pt-4">
                   <div>
                     <p className="text-xl font-semibold">{fmt(totalYearlyUSD)}</p>
-                    <p className="text-zinc-500 text-[10px] uppercase font-semibold mt-1">За год</p>
+                    <p className="text-zinc-500 text-[10px] uppercase font-semibold mt-1">{t.per_year}</p>
                   </div>
                   <div className="text-right">
                     <p className="text-xl font-semibold">{fmt(totalMonthlyUSD / 30)}</p>
-                    <p className="text-zinc-500 text-[10px] uppercase font-semibold mt-1">В день</p>
+                    <p className="text-zinc-500 text-[10px] uppercase font-semibold mt-1">{t.per_day}</p>
                   </div>
                 </div>
               </section>
@@ -642,7 +677,7 @@ const App = ({ session }) => {
                 <button onClick={openAdd}
                   className="w-2/3 flex items-center justify-center gap-2 bg-white text-black font-semibold text-sm rounded-2xl py-3.5 active:scale-[0.97] transition shadow-lg">
                   <Plus className="w-4 h-4" />
-                  Добавить подписку
+                  {t.add_sub}
                 </button>
               </div>
 
@@ -664,28 +699,28 @@ const App = ({ session }) => {
                     </div>
                   </div>
                   <div className="space-y-2">
-                    <p className="text-lg font-semibold tracking-tight">Пока тут пусто</p>
+                    <p className="text-lg font-semibold tracking-tight">{t.empty_title}</p>
                     <p className="text-sm text-zinc-500 leading-relaxed max-w-[260px]">
-                      Самое время вспомнить, за что платишь каждый месяц
+                      {t.empty_subtitle}
                     </p>
                   </div>
                   <button onClick={openAdd}
                     className="flex items-center gap-2 bg-white text-black font-semibold text-sm rounded-2xl px-6 py-3 active:scale-95 transition shadow-lg">
                     <Plus className="w-4 h-4" />
-                    Добавить первую подписку
+                    {t.add_first_sub}
                   </button>
                 </motion.div>
               ) : (
                 <section className="space-y-3">
                   <div className="flex items-center justify-between px-1">
-                    <SectionTitle icon={List} label="Все подписки" />
+                    <SectionTitle icon={List} label={t.all_subs} />
                     <button onClick={cycleSortBy} className="flex items-center gap-1 text-[10px] text-zinc-500 hover:text-zinc-300 transition font-semibold uppercase tracking-wide">
                       <ArrowUpDown className="w-3 h-3" />{sortLabel}
                     </button>
                   </div>
                   <div className="relative px-1">
                     <Search className="absolute left-4 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-zinc-600 pointer-events-none" />
-                    <input value={searchQuery} onChange={e => setSearchQuery(e.target.value)} placeholder="Поиск..."
+                    <input value={searchQuery} onChange={e => setSearchQuery(e.target.value)} placeholder={t.search_placeholder}
                       className="w-full bg-zinc-900/60 border border-zinc-800 rounded-2xl pl-9 pr-9 py-2.5 text-sm focus:outline-none focus:border-zinc-600 transition text-zinc-200 placeholder:text-zinc-600" />
                     {searchQuery && (
                       <button onClick={() => setSearchQuery('')} className="absolute right-4 top-1/2 -translate-y-1/2 text-zinc-600 hover:text-zinc-400 transition">
@@ -696,7 +731,7 @@ const App = ({ session }) => {
                   <div className="bg-[#1C1C1E] rounded-3xl border border-zinc-800/60 divide-y divide-zinc-800/80 overflow-hidden">
                     {!swipeHinted && sortedSubs.length > 0 && (
                       <div className="px-4 py-2 text-[10px] text-zinc-600 text-center tracking-wide">
-                        ← свайп для удаления · свайп для редактирования →
+                        {t.swipe_hint}
                       </div>
                     )}
                     {sortedSubs.map(sub => (
@@ -706,7 +741,7 @@ const App = ({ session }) => {
                     {sortedSubs.length === 0 && searchQuery && (
                       <div className="flex flex-col items-center gap-2 px-4 py-8 text-center">
                         <Search className="w-6 h-6 text-zinc-700" />
-                        <p className="text-sm text-zinc-500">Ничего не найдено по «{searchQuery}»</p>
+                        <p className="text-sm text-zinc-500">{t.nothing_found(searchQuery)}</p>
                       </div>
                     )}
                   </div>
@@ -719,7 +754,7 @@ const App = ({ session }) => {
           <div ref={tabRefs.calendar} className={`absolute inset-0 overflow-y-auto no-scrollbar pb-32 safe-top ${activeTab === 'calendar' ? 'block' : 'hidden'}`}>
             <div className="p-4 pt-6 space-y-5">
               <header className="flex flex-col items-center gap-2 pt-2 mb-2">
-                <h2 className="text-lg font-semibold tracking-tight">Календарь</h2>
+                <h2 className="text-lg font-semibold tracking-tight">{t.calendar_title}</h2>
                 <div className="w-9 h-9 rounded-2xl bg-zinc-800 flex items-center justify-center border border-zinc-700">
                   <CalendarDays className="w-4 h-4 text-sky-300" />
                 </div>
@@ -752,14 +787,14 @@ const App = ({ session }) => {
           <div ref={tabRefs.analytics} className={`absolute inset-0 overflow-y-auto no-scrollbar pb-32 safe-top ${activeTab === 'analytics' ? 'block' : 'hidden'}`}>
             <div className="p-4 pt-6 space-y-4">
               <header className="flex flex-col items-center gap-2 pt-2 mb-2">
-                <h2 className="text-lg font-semibold tracking-tight">Аналитика</h2>
+                <h2 className="text-lg font-semibold tracking-tight">{t.analytics_title}</h2>
                 <div className="w-9 h-9 rounded-2xl bg-zinc-800 flex items-center justify-center border border-zinc-700">
                   <BarChart2 className="w-4 h-4 text-purple-300" />
                 </div>
               </header>
               <div className="bg-[#1C1C1E] rounded-3xl border border-zinc-800/60 p-5 space-y-3">
                 <div className="flex justify-between items-center">
-                  <span className="text-xs text-zinc-400 uppercase tracking-[0.16em]">Всего / мес</span>
+                  <span className="text-xs text-zinc-400 uppercase tracking-[0.16em]">{t.per_month}</span>
                   <span className="text-base font-semibold">{fmt(totalMonthlyUSD)}</span>
                 </div>
                 <div className="w-full h-2 bg-zinc-800 rounded-full overflow-hidden">
@@ -768,7 +803,7 @@ const App = ({ session }) => {
               </div>
               {byCategory.length > 0 && (
                 <div className="bg-[#1C1C1E] rounded-3xl border border-zinc-800/60 p-5 space-y-4">
-                  <p className="text-xs text-zinc-500 uppercase tracking-[0.16em]">По категориям</p>
+                  <p className="text-xs text-zinc-500 uppercase tracking-[0.16em]">{t.by_categories}</p>
                   {byCategory.map(cat => {
                     const share = totalMonthlyUSD ? (cat.total / totalMonthlyUSD) * 100 : 0;
                     const Icon  = cat.icon;
@@ -780,8 +815,8 @@ const App = ({ session }) => {
                               <Icon className={`w-3.5 h-3.5 ${cat.color}`} />
                             </div>
                             <div>
-                              <p className="text-sm font-medium">{cat.label}</p>
-                              <p className="text-[10px] text-zinc-500">{cat.subs.length} подп.</p>
+                              <p className="text-sm font-medium">{t[cat.labelKey]}</p>
+                              <p className="text-[10px] text-zinc-500">{cat.subs.length}</p>
                             </div>
                           </div>
                           <div className="text-right shrink-0">
@@ -800,8 +835,8 @@ const App = ({ session }) => {
               )}
               {/* По подпискам */}
               <div className="bg-[#1C1C1E] rounded-3xl border border-zinc-800/60 p-5 space-y-4">
-                <p className="text-xs text-zinc-500 uppercase tracking-[0.16em]">По подпискам</p>
-                {activeSubs.length === 0 && <p className="text-sm text-zinc-500">Добавьте хотя бы одну подписку.</p>}
+                <p className="text-xs text-zinc-500 uppercase tracking-[0.16em]">{t.by_subscriptions}</p>
+                {activeSubs.length === 0 && <p className="text-sm text-zinc-500">{t.add_first_sub}</p>}
                 {[...activeSubs].sort((a, b) => monthly(b) - monthly(a)).map(sub => {
                   const share = totalMonthlyUSD ? (monthly(sub) / totalMonthlyUSD) * 100 : 0;
                   return (
@@ -811,7 +846,7 @@ const App = ({ session }) => {
                           <LogoIcon sub={sub} size="sm" />
                           <div className="min-w-0">
                             <p className="text-sm font-medium truncate">{sub.name}</p>
-                            <p className="text-xs text-zinc-500">{fmt(monthly(sub))} / мес</p>
+                            <p className="text-xs text-zinc-500">{fmt(monthly(sub))} / {t.sub_per_month}</p>
                           </div>
                         </div>
                         <p className="text-sm font-semibold shrink-0">{share.toFixed(0)}<span className="text-xs text-zinc-500 ml-0.5">%</span></p>
@@ -830,14 +865,14 @@ const App = ({ session }) => {
                 if (trialSubs.length === 0) return null;
                 return (
                   <div className="bg-[#1C1C1E] rounded-3xl border border-amber-500/20 p-5 space-y-3">
-                    <p className="text-xs text-amber-400/70 uppercase tracking-[0.16em]">Пробный период</p>
+                    <p className="text-xs text-amber-400/70 uppercase tracking-[0.16em]">{t.trial_period}</p>
                     {trialSubs.map(sub => (
                       <div key={sub.id} className="flex items-center justify-between gap-3">
                         <div className="flex items-center gap-3 min-w-0">
                           <LogoIcon sub={sub} size="sm" />
                           <div className="min-w-0">
                             <p className="text-sm font-medium truncate">{sub.name}</p>
-                            {sub.trial_end && <p className="text-[10px] text-zinc-500">до {new Date(sub.trial_end).toLocaleDateString('ru-RU', { day: 'numeric', month: 'long' })}</p>}
+                            {sub.trial_end && <p className="text-[10px] text-zinc-500">{new Date(sub.trial_end).toLocaleDateString(lang === 'ru' ? 'ru-RU' : 'en-US', { day: 'numeric', month: 'long' })}</p>}
                           </div>
                         </div>
                         <p className="text-sm text-zinc-500 shrink-0">—</p>
@@ -852,7 +887,7 @@ const App = ({ session }) => {
                 if (pausedSubs.length === 0) return null;
                 return (
                   <div className="bg-[#1C1C1E] rounded-3xl border border-red-500/20 p-5 space-y-3">
-                    <p className="text-xs text-red-400/70 uppercase tracking-[0.16em]">На паузе</p>
+                    <p className="text-xs text-red-400/70 uppercase tracking-[0.16em]">{t.on_pause}</p>
                     {pausedSubs.map(sub => (
                       <div key={sub.id} className="flex items-center justify-between gap-3">
                         <div className="flex items-center gap-3 min-w-0">
@@ -872,9 +907,9 @@ const App = ({ session }) => {
         {/* ── Навбар ── */}
         <div className="fixed bottom-6 left-0 right-0 flex justify-center px-4 pointer-events-none safe-bottom z-30">
           <nav className="bg-zinc-900/90 backdrop-blur-2xl border border-white/10 rounded-full py-3 px-4 max-w-[360px] w-full grid grid-cols-3 shadow-2xl pointer-events-auto">
-            <NavItem icon={Home}         label="Главная"   active={activeTab === 'home'}      onClick={() => switchTab('home')} />
-            <NavItem icon={CalendarDays} label="Календарь" active={activeTab === 'calendar'}  onClick={() => switchTab('calendar')} />
-            <NavItem icon={BarChart2}    label="Аналитика" active={activeTab === 'analytics'} onClick={() => switchTab('analytics')} />
+            <NavItem icon={Home}         label={t.nav_home}      active={activeTab === 'home'}      onClick={() => switchTab('home')} />
+            <NavItem icon={CalendarDays} label={t.nav_calendar}  active={activeTab === 'calendar'}  onClick={() => switchTab('calendar')} />
+            <NavItem icon={BarChart2}    label={t.nav_analytics} active={activeTab === 'analytics'} onClick={() => switchTab('analytics')} />
           </nav>
         </div>
 
@@ -892,11 +927,11 @@ const App = ({ session }) => {
               <div className="pointer-events-auto max-w-[420px] w-full bg-zinc-900 border border-red-500/30 rounded-2xl px-4 py-3 flex flex-col gap-2 shadow-xl shadow-red-500/10">
                 <div className="flex items-center justify-between gap-3">
                   <div className="text-sm">
-                    <p className="font-medium text-zinc-50">Подписка удалена</p>
+                    <p className="font-medium text-zinc-50">{t.sub_deleted}</p>
                     <p className="text-xs text-zinc-400 truncate">{toast.sub?.name}</p>
                   </div>
                   <button onClick={undoDelete} className="text-xs font-semibold text-red-400 px-3 py-1.5 rounded-full bg-red-500/15 border border-red-500/40 active:scale-95 transition shrink-0">
-                    Отменить
+                    {t.undo}
                   </button>
                 </div>
                 <div className="w-full h-1 rounded-full bg-zinc-800 overflow-hidden">
@@ -955,58 +990,24 @@ const SwipeDemo = () => {
 };
 
 // ─── Онбординг ─────────────────────────────────────────────────────────────────
-const ONBOARDING_STEPS = [
-  {
-    icon: Sparkles,
-    iconColor: 'text-white',
-    iconBg: 'bg-zinc-800',
-    title: 'Привет!',
-    subtitle: 'CheckUrSubs поможет отслеживать все подписки в одном месте — сколько тратишь, когда списывается и на что уходят деньги.',
-  },
-  {
-    icon: Plus,
-    iconColor: 'text-black',
-    iconBg: 'bg-white',
-    title: 'Добавляй подписки',
-    subtitle: 'Нажми «Добавить подписку». Введи название — приложение само подскажет сервис и подставит категорию. Укажи сумму и дату списания.',
-  },
-  {
-    type: 'swipe',
-    icon: List,
-    iconColor: 'text-zinc-300',
-    iconBg: 'bg-zinc-800',
-    title: 'Управляй подписками',
-    subtitle: 'Свайп влево — удалить. Свайп вправо — редактировать.',
-  },
-  {
-    icon: CalendarDays,
-    iconColor: 'text-sky-300',
-    iconBg: 'bg-sky-500/15',
-    title: 'Следи за датами',
-    subtitle: 'Вкладка «Календарь» покажет, в какие дни месяца и сколько списывается. Вкладка «Скоро» на главной — ближайшие 7 дней.',
-  },
-  {
-    icon: BarChart2,
-    iconColor: 'text-purple-300',
-    iconBg: 'bg-purple-500/15',
-    title: 'Анализируй расходы',
-    subtitle: 'Вкладка «Аналитика» разбивает траты по категориям и сервисам. Выбери удобную валюту — курс обновляется автоматически.',
-  },
-  {
-    type: 'pwa',
-    icon: Download,
-    iconColor: 'text-green-300',
-    iconBg: 'bg-green-500/15',
-    title: 'Установи приложение',
-    subtitle: 'Добавь на экран домой — работает как обычное приложение, без адресной строки браузера.',
-  },
+const getOnboardingSteps = (t) => [
+  { icon: Sparkles,    iconColor: 'text-white',      iconBg: 'bg-zinc-800',       ...t.onb_slides[0] },
+  { icon: Plus,        iconColor: 'text-black',       iconBg: 'bg-white',          ...t.onb_slides[1] },
+  { type: 'swipe',
+    icon: List,        iconColor: 'text-zinc-300',    iconBg: 'bg-zinc-800',       ...t.onb_slides[2] },
+  { icon: CalendarDays,iconColor: 'text-sky-300',     iconBg: 'bg-sky-500/15',     ...t.onb_slides[3] },
+  { icon: BarChart2,   iconColor: 'text-purple-300',  iconBg: 'bg-purple-500/15',  ...t.onb_slides[4] },
+  { type: 'pwa',
+    icon: Download,    iconColor: 'text-green-300',   iconBg: 'bg-green-500/15',   ...t.onb_slides[5] },
 ];
 
-const Onboarding = ({ onDone }) => {
+const Onboarding = ({ onDone, toggleLang, lang }) => {
+  const t = useT();
   const [step,  setStep]  = useState(0);
   const startX = useRef(0);
   const startY = useRef(0);
 
+  const ONBOARDING_STEPS = getOnboardingSteps(t);
   const total  = ONBOARDING_STEPS.length;
   const isLast = step === total - 1;
   const s      = ONBOARDING_STEPS[step];
@@ -1027,8 +1028,22 @@ const Onboarding = ({ onDone }) => {
       onTouchStart={onTouchStart} onTouchEnd={onTouchEnd}>
       <div className="w-full max-w-[450px] min-h-screen border-x border-zinc-900 bg-black flex flex-col overflow-hidden">
 
+        {/* Тогл языка — только на первом слайде */}
+        {step === 0 && toggleLang && (
+          <div className="flex justify-end px-6 pt-6">
+            <button onClick={toggleLang}
+              className="relative flex items-center h-7 w-[64px] rounded-full bg-zinc-800 border border-zinc-700 p-[3px] select-none">
+              <motion.div className="absolute w-[28px] h-[22px] bg-white rounded-full shadow"
+                animate={{ x: lang === 'en' ? 32 : 0 }}
+                transition={{ type: 'spring', stiffness: 400, damping: 30 }} />
+              <span className={`relative z-10 flex-1 text-center text-[10px] font-bold tracking-wide transition-colors ${lang === 'ru' ? 'text-black' : 'text-zinc-500'}`}>RU</span>
+              <span className={`relative z-10 flex-1 text-center text-[10px] font-bold tracking-wide transition-colors ${lang === 'en' ? 'text-black' : 'text-zinc-500'}`}>EN</span>
+            </button>
+          </div>
+        )}
+
         {/* Контент — растягивается, но контролирует выравнивание */}
-        <div className="flex-1 flex flex-col px-8 pt-16">
+        <div className="flex-1 flex flex-col px-8 pt-8">
 
           {/* Слайд — фиксированная зона контента */}
           <div className="flex-1 flex flex-col items-center justify-center">
@@ -1073,8 +1088,8 @@ const Onboarding = ({ onDone }) => {
                               </svg>
                             </div>
                             <div>
-                              <p className="text-sm font-medium text-white">Нажми «Поделиться»</p>
-                              <p className="text-xs text-zinc-500">Кнопка внизу браузера</p>
+                              <p className="text-sm font-medium text-white">{t.pwa_ios_share}</p>
+                              <p className="text-xs text-zinc-500">{t.pwa_ios_share_hint}</p>
                             </div>
                           </div>
                           <div className="flex items-center gap-3">
@@ -1086,8 +1101,8 @@ const Onboarding = ({ onDone }) => {
                               </svg>
                             </div>
                             <div>
-                              <p className="text-sm font-medium text-white">«На экран «Домой»»</p>
-                              <p className="text-xs text-zinc-500">Прокрути список вниз</p>
+                              <p className="text-sm font-medium text-white">{t.pwa_ios_add}</p>
+                              <p className="text-xs text-zinc-500">{t.pwa_ios_add_hint}</p>
                             </div>
                           </div>
                         </div>
@@ -1103,8 +1118,8 @@ const Onboarding = ({ onDone }) => {
                               </svg>
                             </div>
                             <div>
-                              <p className="text-sm font-medium text-white">Меню браузера</p>
-                              <p className="text-xs text-zinc-500">Три точки справа вверху</p>
+                              <p className="text-sm font-medium text-white">{t.pwa_android_menu}</p>
+                              <p className="text-xs text-zinc-500">{t.pwa_android_menu_hint}</p>
                             </div>
                           </div>
                           <div className="flex items-center gap-3">
@@ -1115,8 +1130,8 @@ const Onboarding = ({ onDone }) => {
                               </svg>
                             </div>
                             <div>
-                              <p className="text-sm font-medium text-white">«Установить приложение»</p>
-                              <p className="text-xs text-zinc-500">Или «Добавить на гл. экран»</p>
+                              <p className="text-sm font-medium text-white">{t.pwa_android_install}</p>
+                              <p className="text-xs text-zinc-500">{t.pwa_android_install_hint}</p>
                             </div>
                           </div>
                         </div>
@@ -1144,10 +1159,10 @@ const Onboarding = ({ onDone }) => {
         <div className="px-8 pb-12 space-y-3">
           <button onClick={goNext}
             className="w-full bg-white text-black font-semibold py-3.5 rounded-2xl active:scale-95 transition text-sm">
-            {isLast ? 'Начать' : 'Далее'}
+            {isLast ? 'CheckUrSubs →' : t.onb_next}
           </button>
           {!isLast && (
-            <button onClick={() => onDone(step)} className="w-full text-zinc-500 text-sm py-2">Пропустить</button>
+            <button onClick={() => onDone(step)} className="w-full text-zinc-500 text-sm py-2">{t.onb_skip}</button>
           )}
         </div>
       </div>
@@ -1190,6 +1205,7 @@ const SUPPORT_LINKS = [
 ];
 
 const SupportMenu = () => {
+  const t = useT();
   const [open, setOpen] = useState(false);
   const [copied, setCopied] = useState(false);
   const [wordText, setWordText] = useState('');
@@ -1233,8 +1249,8 @@ const SupportMenu = () => {
             exit={{ opacity: 0, scale: 0.92, y: -6 }} transition={{ duration: 0.15 }}
             className="absolute left-0 top-12 bg-zinc-900 border border-zinc-700 rounded-2xl shadow-2xl z-50 w-[220px] overflow-hidden">
             <div className="px-4 py-3 border-b border-zinc-800">
-              <p className="text-xs font-semibold text-zinc-200">Поддержать разработчика</p>
-              <p className="text-[11px] text-zinc-500 mt-0.5">Приложение бесплатное и всегда будет таким</p>
+              <p className="text-xs font-semibold text-zinc-200">{t.support_title}</p>
+              <p className="text-[11px] text-zinc-500 mt-0.5">{t.support_subtitle}</p>
             </div>
             {SUPPORT_LINKS.map(link => (
               <div key={link.id} className={`mx-3 my-2 rounded-xl border ${link.border} ${link.bg} p-3`}>
@@ -1247,12 +1263,12 @@ const SupportMenu = () => {
                   <a href={link.url} target="_blank" rel="noopener noreferrer"
                     onClick={() => setOpen(false)}
                     className={`block w-full text-center text-xs font-semibold py-1.5 rounded-lg ${link.color} bg-black/20 active:scale-95 transition`}>
-                    Открыть →
+                    {t.support_open}
                   </a>
                 ) : (
                   <button onClick={() => copyAddress(link.address)}
                     className={`w-full text-xs font-semibold py-1.5 rounded-lg ${link.color} bg-black/20 active:scale-95 transition`}>
-                    {copied ? '✓ Скопировано' : 'Скопировать адрес'}
+                    {copied ? t.support_copied : t.support_copy}
                   </button>
                 )}
               </div>
@@ -1261,23 +1277,23 @@ const SupportMenu = () => {
             <div className="mx-3 mb-3 rounded-xl border border-pink-500/30 bg-pink-500/10 p-3">
               <div className="flex items-center gap-2 mb-2">
                 <MessageCircle className="w-4 h-4 text-pink-400" />
-                <span className="text-sm font-semibold text-zinc-100">Добрым словом</span>
+                <span className="text-sm font-semibold text-zinc-100">{t.support_word}</span>
               </div>
               {wordStatus === 'sent'
-                ? <p className="text-xs text-pink-400 text-center py-1">❤️ Спасибо, это важно!</p>
+                ? <p className="text-xs text-pink-400 text-center py-1">{t.support_word_thanks}</p>
                 : <>
                     <textarea
                       value={wordText}
                       onChange={e => setWordText(e.target.value)}
-                      placeholder="Напишите что думаете..."
+                      placeholder={t.support_word_placeholder}
                       rows={3}
                       className="w-full bg-black/20 rounded-lg text-xs text-zinc-200 placeholder-zinc-600 px-2.5 py-2 resize-none outline-none border border-transparent focus:border-pink-500/40 transition"
                     />
                     <button onClick={sendWord} disabled={!wordText.trim() || wordStatus === 'sending'}
                       className="w-full mt-2 text-xs font-semibold py-1.5 rounded-lg text-pink-400 bg-black/20 active:scale-95 transition disabled:opacity-40">
-                      {wordStatus === 'sending' ? 'Отправляем...' : 'Отправить →'}
+                      {wordStatus === 'sending' ? t.support_word_sending : t.support_word_send}
                     </button>
-                    {wordStatus === 'error' && <p className="text-[10px] text-red-400 text-center mt-1">Ошибка, попробуйте позже</p>}
+                    {wordStatus === 'error' && <p className="text-[10px] text-red-400 text-center mt-1">{t.support_word_error}</p>}
                   </>
               }
             </div>
@@ -1289,6 +1305,7 @@ const SupportMenu = () => {
 };
 
 const AvatarMenu = ({ session, onLogout }) => {
+  const t = useT();
   const [open, setOpen] = useState(false);
   const ref = useRef(null);
 
@@ -1326,7 +1343,7 @@ const AvatarMenu = ({ session, onLogout }) => {
             <button onClick={() => { setOpen(false); onLogout(); }}
               className="w-full flex items-center gap-3 px-4 py-3 text-sm text-red-400 hover:bg-zinc-800 transition active:bg-zinc-700">
               <LogOut className="w-4 h-4" />
-              Выйти
+              {t.logout}
             </button>
           </motion.div>
         )}
@@ -1337,6 +1354,7 @@ const AvatarMenu = ({ session, onLogout }) => {
 
 // ─── Календарь ─────────────────────────────────────────────────────────────────
 const CalendarSection = ({ subscriptions, fmt, fmtReal, monthly, month, year, onPrev, onNext, calTotal, calYearly, isPast, calMonth }) => {
+  const t = useT();
   const today       = new Date();
   const isToday     = (d) => d === today.getDate() && month === today.getMonth() && year === today.getFullYear();
   const daysInMonth = new Date(year, month + 1, 0).getDate();
@@ -1381,13 +1399,13 @@ const CalendarSection = ({ subscriptions, fmt, fmtReal, monthly, month, year, on
         <button onClick={onPrev} className="w-8 h-8 rounded-xl bg-zinc-800 border border-zinc-700 flex items-center justify-center text-zinc-400 hover:text-white transition active:scale-95">
           <ChevronDown className="w-4 h-4 rotate-90" />
         </button>
-        <p className="text-sm font-semibold">{MONTHS_RU[month]} {year}</p>
+        <p className="text-sm font-semibold">{t.months_full[month]} {year}</p>
         <button onClick={onNext} className="w-8 h-8 rounded-xl bg-zinc-800 border border-zinc-700 flex items-center justify-center text-zinc-400 hover:text-white transition active:scale-95">
           <ChevronDown className="w-4 h-4 -rotate-90" />
         </button>
       </div>
       <div className="grid grid-cols-7">
-        {DAYS_RU.map(d => <div key={d} className="text-center text-[10px] text-zinc-600 font-semibold uppercase tracking-wide py-1">{d}</div>)}
+        {t.days_short.map(d => <div key={d} className="text-center text-[10px] text-zinc-600 font-semibold uppercase tracking-wide py-1">{d}</div>)}
       </div>
       <div className="grid grid-cols-7 gap-1">
         {cells.map((day, i) => {
@@ -1420,11 +1438,11 @@ const CalendarSection = ({ subscriptions, fmt, fmtReal, monthly, month, year, on
       {/* Суммы — сразу под сеткой */}
       <div className="bg-[#1C1C1E] rounded-3xl border border-zinc-800/60 p-4 space-y-2">
         <div className="flex justify-between text-sm">
-          <span className="text-zinc-400">{isPast ? `Потрачено в ${MONTHS_GENITIVE[calMonth ?? month]}` : `Ожидается в ${MONTHS_GENITIVE[calMonth ?? month]}`}</span>
+          <span className="text-zinc-400">{isPast ? t.spent(t.months_genitive[calMonth ?? month]) : t.expected(t.months_genitive[calMonth ?? month])}</span>
           <span className="font-semibold">{fmt(calTotal ?? 0)}</span>
         </div>
         <div className="flex justify-between text-sm">
-          <span className="text-zinc-400">В год</span>
+          <span className="text-zinc-400">{t.per_year}</span>
           <span className="font-semibold">{fmt(calYearly ?? 0)}</span>
         </div>
       </div>
@@ -1438,13 +1456,13 @@ const CalendarSection = ({ subscriptions, fmt, fmtReal, monthly, month, year, on
                   <div className="min-w-0">
                     <div className="flex items-center gap-1.5">
                       <p className="text-sm font-medium truncate">{sub.name}</p>
-                      {sub.status === 'trial' && <span className="text-[10px] font-semibold text-amber-400 bg-amber-500/10 border border-amber-500/30 px-1.5 py-0.5 rounded-lg shrink-0">пробный</span>}
+                      {sub.status === 'trial' && <span className="text-[10px] font-semibold text-amber-400 bg-amber-500/10 border border-amber-500/30 px-1.5 py-0.5 rounded-lg shrink-0">{t.modal_status_trial.toLowerCase()}</span>}
                     </div>
                     <p className="text-xs text-zinc-500">{day} {MONTHS_SHORT[month]}</p>
                   </div>
                 </div>
                 {sub.status === 'trial'
-                  ? <p className="text-xs text-zinc-500 shrink-0">не списывается</p>
+                  ? <p className="text-xs text-zinc-500 shrink-0">{t.not_billing}</p>
                   : <p className="text-sm font-semibold shrink-0">{fmtReal(sub)}</p>
                 }
               </div>
@@ -1458,12 +1476,13 @@ const CalendarSection = ({ subscriptions, fmt, fmtReal, monthly, month, year, on
 
 // ─── Soon ──────────────────────────────────────────────────────────────────────
 const SoonSection = ({ soonSubs, fmtOriginal }) => {
+  const t = useT();
   const ref = useDragScroll();
   return (
     <section className="space-y-3">
-      <SectionTitle icon={CalendarDays} label="Скоро" />
+      <SectionTitle icon={CalendarDays} label={t.soon} />
       {soonSubs.length === 0
-        ? <p className="text-sm text-zinc-600 px-1">Нет списаний в ближайшие 7 дней</p>
+        ? <p className="text-sm text-zinc-600 px-1">{t.soon_empty}</p>
         : <div ref={ref} data-no-tab-swipe className="flex gap-3 overflow-x-auto no-scrollbar px-1 pb-1">
             {soonSubs.map(sub => <SoonCard key={sub.id} sub={sub} fmtOriginal={fmtOriginal} />)}
           </div>
@@ -1513,6 +1532,8 @@ const CategoryBadge = ({ cat, tiny = false }) => {
 };
 
 const SoonCard = ({ sub, fmtOriginal }) => {
+  const t    = useT();
+  const lang = useLang();
   const cat = sub.category ? getCat(sub.category) : null;
   return (
     <div className="w-[168px] bg-[#1C1C1E] rounded-[28px] p-5 border border-zinc-800 active:scale-[0.97] transition shrink-0 flex flex-col">
@@ -1530,6 +1551,8 @@ const SoonCard = ({ sub, fmtOriginal }) => {
 };
 
 const SubscriptionRow = ({ sub, fmt, fmtOriginal, monthly, onEdit, onDelete }) => {
+  const t    = useT();
+  const lang = useLang();
   const cat = sub.category ? getCat(sub.category) : null;
   const x = useMotionValue(0);
   const startRef = useRef(null);
@@ -1557,10 +1580,10 @@ const SubscriptionRow = ({ sub, fmt, fmtOriginal, monthly, onEdit, onDelete }) =
       onPointerMove={onPointerMove}>
       <div className="absolute inset-0 flex">
         <div className="flex-1 bg-emerald-600/90 flex items-center pl-6 text-xs font-semibold gap-2">
-          <Pencil className="w-3.5 h-3.5" /> Редактировать
+          <Pencil className="w-3.5 h-3.5" /> {t.modal_edit}
         </div>
         <div className="flex-1 bg-red-600/90 flex items-center justify-end pr-6 text-xs font-semibold gap-2">
-          Удалить <Trash2 className="w-3.5 h-3.5" />
+          {t.sub_delete} <Trash2 className="w-3.5 h-3.5" />
         </div>
       </div>
       <motion.div
@@ -1584,13 +1607,13 @@ const SubscriptionRow = ({ sub, fmt, fmtOriginal, monthly, onEdit, onDelete }) =
           <div className="flex items-center gap-2">
             <p className="text-sm font-medium truncate">{sub.name}</p>
             {cat && <CategoryBadge cat={cat} tiny />}
-            {sub.status === 'paused' && <span className="text-[10px] font-semibold text-red-400 bg-red-500/10 border border-red-500/30 px-1.5 py-0.5 rounded-lg shrink-0">пауза</span>}
-            {sub.status === 'trial'  && <span className="text-[10px] font-semibold text-amber-400 bg-amber-500/10 border border-amber-500/30 px-1.5 py-0.5 rounded-lg shrink-0">пробный</span>}
+            {sub.status === 'paused' && <span className="text-[10px] font-semibold text-red-400 bg-red-500/10 border border-red-500/30 px-1.5 py-0.5 rounded-lg shrink-0">{t.badge_paused}</span>}
+            {sub.status === 'trial'  && <span className="text-[10px] font-semibold text-amber-400 bg-amber-500/10 border border-amber-500/30 px-1.5 py-0.5 rounded-lg shrink-0">{t.badge_trial}</span>}
           </div>
           <p className="text-xs text-zinc-500 truncate">
-            {fmtOriginal(sub)} / {sub.period === 'yearly' ? 'год' : 'мес'}
+            {fmtOriginal(sub)} / {sub.period === 'yearly' ? t.sub_per_year : t.sub_per_month}
             {sub.date && sub.date !== '—' && ` · ${sub.date}`}
-            {sub.status === 'trial' && sub.trial_end && ` · до ${new Date(sub.trial_end).toLocaleDateString('ru-RU', { day: 'numeric', month: 'short' })}`}
+            {sub.status === 'trial' && sub.trial_end && ` · ${new Date(sub.trial_end).toLocaleDateString(lang === 'en' ? 'en-US' : 'ru-RU', { day: 'numeric', month: 'short' })}`}
           </p>
         </div>
       </motion.div>
@@ -1629,6 +1652,8 @@ const CurrencySelector = ({ value, onChange }) => {
 // ─── Модалка ───────────────────────────────────────────────────────────────────
 // ─── DatePicker ────────────────────────────────────────────────────────────────
 const DatePicker = ({ value, onChange, label }) => {
+  const t    = useT();
+  const lang = useLang();
   const [open, setOpen] = useState(false);
   const today = new Date();
   const parsed = value ? new Date(value) : null;
@@ -1671,8 +1696,8 @@ const DatePicker = ({ value, onChange, label }) => {
         <span className="text-xs text-amber-400 font-medium">{label}</span>
         <span className="ml-auto text-sm">
           {parsed
-            ? <span className="text-zinc-200">{parsed.toLocaleDateString('ru-RU', { day: 'numeric', month: 'long' })}</span>
-            : <span className="text-zinc-600">Выбрать дату</span>}
+            ? <span className="text-zinc-200">{parsed.toLocaleDateString(lang === 'en' ? 'en-US' : 'ru-RU', { day: 'numeric', month: 'long' })}</span>
+            : <span className="text-zinc-600">{t.datepicker_choose}</span>}
         </span>
       </div>
       <AnimatePresence>
@@ -1689,7 +1714,7 @@ const DatePicker = ({ value, onChange, label }) => {
                 className="w-7 h-7 rounded-xl bg-zinc-800 border border-zinc-700 flex items-center justify-center text-zinc-400 active:scale-95 transition">
                 <ChevronDown className="w-3.5 h-3.5 rotate-90" />
               </button>
-              <span className="text-sm font-semibold">{MONTHS_RU[viewMonth]} {viewYear}</span>
+              <span className="text-sm font-semibold">{t.months_full[viewMonth]} {viewYear}</span>
               <button type="button" onClick={nextMonth}
                 className="w-7 h-7 rounded-xl bg-zinc-800 border border-zinc-700 flex items-center justify-center text-zinc-400 active:scale-95 transition">
                 <ChevronDown className="w-3.5 h-3.5 -rotate-90" />
@@ -1697,7 +1722,7 @@ const DatePicker = ({ value, onChange, label }) => {
             </div>
             {/* Дни недели */}
             <div className="grid grid-cols-7 mb-1">
-              {DAYS_RU.map(d => <div key={d} className="text-center text-[10px] text-zinc-600 font-semibold uppercase py-1">{d}</div>)}
+              {t.days_short.map(d => <div key={d} className="text-center text-[10px] text-zinc-600 font-semibold uppercase py-1">{d}</div>)}
             </div>
             {/* Дни */}
             <div className="grid grid-cols-7 gap-0.5">
@@ -1724,6 +1749,7 @@ const DatePicker = ({ value, onChange, label }) => {
 };
 
 const SubModal = ({ initial, currency, onSave, onClose }) => {
+  const t = useT();
   // Валюта модалки: при редактировании — оригинальная валюта подписки, при добавлении — текущая глобальная
   const [modalCurrency, setModalCurrency] = useState(initial?.currency_code || currency);
   const curr = getCurrency(modalCurrency);
@@ -1778,12 +1804,12 @@ const SubModal = ({ initial, currency, onSave, onClose }) => {
         transition={{ type: 'spring', damping: 26, stiffness: 220 }}
         className="fixed bottom-4 left-4 right-4 bg-zinc-900 rounded-[36px] p-7 z-50 border border-zinc-800 max-w-[450px] mx-auto shadow-2xl">
 
-        <h2 className="text-xl font-semibold mb-5 text-center">{initial ? 'Редактировать' : 'Новая подписка'}</h2>
+        <h2 className="text-xl font-semibold mb-5 text-center">{initial ? t.modal_edit : t.modal_new}</h2>
 
         <div className="space-y-3">
           {/* Название + саджест */}
           <div className="relative">
-            <input placeholder="Название (например, Netflix)"
+            <input placeholder={t.modal_name_placeholder}
               className="w-full bg-black border border-zinc-800 rounded-2xl px-4 py-3 text-sm focus:outline-none focus:border-zinc-500 transition"
               value={name} onChange={e => setName(e.target.value)}
               onFocus={() => suggestions.length > 0 && setShowSuggestions(true)}
@@ -1826,7 +1852,7 @@ const SubModal = ({ initial, currency, onSave, onClose }) => {
           <div className="flex gap-2">
             <div className="relative flex-1">
               <span className="absolute left-4 top-1/2 -translate-y-1/2 text-zinc-400 text-sm pointer-events-none">{curr.symbol}</span>
-              <input type="number" inputMode="decimal" placeholder="Цена"
+              <input type="number" inputMode="decimal" placeholder={t.modal_price_placeholder}
                 className="w-full bg-black border border-zinc-800 rounded-2xl pl-8 pr-4 py-3 text-sm focus:outline-none focus:border-zinc-500 transition"
                 value={price} onChange={e => setPrice(e.target.value)} />
             </div>
@@ -1838,7 +1864,7 @@ const SubModal = ({ initial, currency, onSave, onClose }) => {
             {['monthly', 'yearly'].map(p => (
               <button key={p} type="button" onClick={() => { setPeriod(p); if (p === 'monthly') setMonth(''); }}
                 className={`flex-1 py-3 rounded-2xl text-sm font-medium border transition ${period === p ? 'bg-white text-black border-white' : 'bg-black border-zinc-800 text-zinc-400'}`}>
-                {p === 'monthly' ? 'В месяц' : 'В год'}
+                {p === 'monthly' ? t.modal_monthly : t.modal_yearly}
               </button>
             ))}
           </div>
@@ -1846,9 +1872,9 @@ const SubModal = ({ initial, currency, onSave, onClose }) => {
           {/* Статус */}
           <div className="flex gap-2">
             {[
-              { id: 'active', label: 'Активна',    color: 'text-green-400',  bg: 'bg-green-500/15',  border: 'border-green-500/40'  },
-              { id: 'paused', label: 'На паузе',   color: 'text-red-400',    bg: 'bg-red-500/15',    border: 'border-red-500/40'    },
-              { id: 'trial',  label: 'Пробный',    color: 'text-amber-400',  bg: 'bg-amber-500/15',  border: 'border-amber-500/40'  },
+              { id: 'active', label: t.modal_status_active, color: 'text-green-400',  bg: 'bg-green-500/15',  border: 'border-green-500/40'  },
+              { id: 'paused', label: t.modal_status_paused, color: 'text-red-400',    bg: 'bg-red-500/15',    border: 'border-red-500/40'    },
+              { id: 'trial',  label: t.modal_status_trial,  color: 'text-amber-400',  bg: 'bg-amber-500/15',  border: 'border-amber-500/40'  },
             ].map(s => (
               <button key={s.id} type="button" onClick={() => setStatus(s.id)}
                 className={`flex-1 py-2.5 rounded-2xl text-xs font-semibold border transition ${status === s.id ? `${s.bg} ${s.border} ${s.color}` : 'bg-black border-zinc-800 text-zinc-500'}`}>
@@ -1862,7 +1888,7 @@ const SubModal = ({ initial, currency, onSave, onClose }) => {
             <DatePicker
               value={trialEnd}
               onChange={setTrialEnd}
-              label="Окончание пробного периода"
+              label={t.modal_trial_end}
             />
           )}
 
@@ -1871,12 +1897,12 @@ const SubModal = ({ initial, currency, onSave, onClose }) => {
           <div className="space-y-1.5">
             {initial && (
               <p className="text-[11px] text-zinc-500 px-1">
-                {period === 'yearly' ? 'Дата списания' : 'Число списания'}
+                {period === 'yearly' ? t.modal_billing_date : t.modal_billing_day}
               </p>
             )}
             <div className="flex gap-2">
               <input type="number" inputMode="numeric"
-                placeholder={period === 'yearly' ? 'День' : 'День списания'}
+                placeholder={period === 'yearly' ? t.modal_day_placeholder : t.modal_day_billing_placeholder}
                 min="1" max="31"
                 className={`${period === 'yearly' ? 'flex-1' : 'w-full'} bg-black border border-zinc-800 rounded-2xl px-4 py-3 text-sm focus:outline-none focus:border-zinc-500 transition`}
                 value={day} onChange={e => { const v = e.target.value; if (v === '' || (Number(v) >= 1 && Number(v) <= 31)) setDay(v); }} />
@@ -1895,7 +1921,7 @@ const SubModal = ({ initial, currency, onSave, onClose }) => {
               return (
                 <button key={cat.id} type="button" onClick={() => setCategory(active ? '' : cat.id)}
                   className={`flex items-center gap-1.5 px-3 py-1.5 rounded-2xl text-xs font-medium border transition ${active ? `${cat.bg} ${cat.border} ${cat.color}` : 'bg-zinc-900 border-zinc-800 text-zinc-500'}`}>
-                  <Icon className="w-3 h-3" />{cat.label}
+                  <Icon className="w-3 h-3" />{t[cat.labelKey]}
                 </button>
               );
             })}
@@ -1904,9 +1930,9 @@ const SubModal = ({ initial, currency, onSave, onClose }) => {
 
         <button disabled={!canSave} onClick={handleSubmit}
           className="mt-5 w-full bg-white text-black font-semibold py-3.5 rounded-2xl active:scale-95 transition disabled:opacity-40 text-sm">
-          {initial ? 'Сохранить' : 'Добавить'}
+          {initial ? t.modal_save : t.modal_add}
         </button>
-        <button type="button" onClick={onClose} className="mt-3 mb-2 w-full text-zinc-400 text-sm py-2">Отмена</button>
+        <button type="button" onClick={onClose} className="mt-3 mb-2 w-full text-zinc-400 text-sm py-2">{t.modal_cancel}</button>
       </motion.div>
     </>
   );
@@ -1980,6 +2006,19 @@ const NavItem = ({ icon: Icon, label, active, onClick }) => (
 export default function Root() {
   const [session,   setSession]   = useState(undefined);
   const [onboarded, setOnboarded] = useState(() => localStorage.getItem('onboarded') === '1');
+  const [lang,      setLang]      = useState(() => {
+    const saved = localStorage.getItem('lang');
+    if (saved) return saved;
+    // Автодетект при первом визите: ru/uk/be → RU, всё остальное → EN
+    const nav = (navigator.language || navigator.languages?.[0] || 'en').toLowerCase();
+    return (nav.startsWith('ru') || nav.startsWith('uk') || nav.startsWith('be')) ? 'ru' : 'en';
+  });
+
+  const toggleLang = () => {
+    const next = lang === 'ru' ? 'en' : 'ru';
+    setLang(next);
+    localStorage.setItem('lang', next);
+  };
 
   useEffect(() => {
     supabase.auth.getSession().then(({ data }) => setSession(data.session ?? null));
@@ -2000,12 +2039,24 @@ export default function Root() {
     </div>
   );
 
-  if (!onboarded) return <Onboarding onDone={(skippedAt) => {
-    if (skippedAt !== undefined) analytics.onboardingSkipped(skippedAt);
-    else analytics.onboardingCompleted();
-    setOnboarded(true);
-    localStorage.setItem('onboarded', '1');
-  }} />;
-  if (!session)   return <Auth />;
-  return <App session={session} />;
+  if (!onboarded) return (
+    <LangContext.Provider value={lang}>
+      <Onboarding toggleLang={toggleLang} lang={lang} onDone={(skippedAt) => {
+        if (skippedAt !== undefined) analytics.onboardingSkipped(skippedAt);
+        else analytics.onboardingCompleted();
+        setOnboarded(true);
+        localStorage.setItem('onboarded', '1');
+      }} />
+    </LangContext.Provider>
+  );
+  if (!session) return (
+    <LangContext.Provider value={lang}>
+      <Auth />
+    </LangContext.Provider>
+  );
+  return (
+    <LangContext.Provider value={lang}>
+      <App session={session} toggleLang={toggleLang} lang={lang} />
+    </LangContext.Provider>
+  );
 }

@@ -1,11 +1,20 @@
 // Версия меняется автоматически при каждом деплое через timestamp
-// Vite подставляет его через vite.config.js (см. ниже)
+// Vite подставляет его через vite.config.js
 const CACHE_VERSION = self.__CACHE_VERSION__ || 'dev';
 const CACHE_NAME    = `checkursubs-${CACHE_VERSION}`;
 
 // ─── Install: ничего не кэшируем заранее, всё lazy ────────────────────────────
 self.addEventListener('install', () => {
-  self.skipWaiting(); // активируемся сразу, не ждём закрытия вкладок
+  // НЕ вызываем skipWaiting здесь — ждём команды от клиента (main.jsx).
+  // Это позволяет не ломать открытую вкладку внезапной сменой SW.
+  // main.jsx сам пошлёт SKIP_WAITING когда новый SW будет готов.
+});
+
+// ─── Слушаем команду от main.jsx ──────────────────────────────────────────────
+self.addEventListener('message', (event) => {
+  if (event.data?.type === 'SKIP_WAITING') {
+    self.skipWaiting();
+  }
 });
 
 // ─── Activate: удаляем все старые кэши ────────────────────────────────────────
@@ -25,12 +34,12 @@ self.addEventListener('push', (event) => {
   try { data = event.data.json(); } catch {}
   event.waitUntil(
     self.registration.showNotification(data.title, {
-      body:    data.body,
-      icon:    '/icon-192.png',
-      badge:   '/icon-96.png',
-      tag:     data.tag || 'checkursubs',
+      body:     data.body,
+      icon:     '/icon-192.png',
+      badge:    '/icon-96.png',
+      tag:      data.tag || 'checkursubs',
       renotify: true,
-      data:    { url: data.url || '/' },
+      data:     { url: data.url || '/' },
     })
   );
 });
@@ -47,6 +56,7 @@ self.addEventListener('notificationclick', (event) => {
   );
 });
 
+// ─── Fetch: стратегия кэширования ─────────────────────────────────────────────
 self.addEventListener('fetch', (event) => {
   const { request } = event;
   if (request.method !== 'GET') return;
