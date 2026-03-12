@@ -2,6 +2,10 @@
 
 > A minimalist subscription tracker. Know exactly what you pay — every month.
 
+## Featured on Product Hunt
+
+[![CheckUrSubs on Product Hunt](https://api.producthunt.com/widgets/embed-image/v1/featured.svg?post_id=1095659&theme=light&t=1773310909532)](https://www.producthunt.com/products/checkursubs?utm_source=badge-featured&utm_medium=badge&utm_campaign=badge-checkursubs)
+
 ![PWA](https://img.shields.io/badge/PWA-ready-blueviolet)
 ![React](https://img.shields.io/badge/React-19-61dafb)
 ![Vite](https://img.shields.io/badge/Vite-7-646cff)
