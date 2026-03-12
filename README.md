@@ -18,6 +18,8 @@ CheckUrSubs helps you keep track of all your subscriptions — streaming, cloud 
 
 Works as a PWA — installs to your home screen on iPhone and Android with no App Store required.
 
+![Dashboard](docs/screenshots/dashboard.png)
+
 ---
 
 ## Features
