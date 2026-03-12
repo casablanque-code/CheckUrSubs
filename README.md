@@ -1,6 +1,6 @@
 # CheckUrSubs 📱
 
-> Минималистичный трекер подписок. Знай сколько тратишь — каждый месяц.
+> A minimalist subscription tracker. Know exactly what you pay — every month.
 
 ![PWA](https://img.shields.io/badge/PWA-ready-blueviolet)
 ![React](https://img.shields.io/badge/React-19-61dafb)
@@ -8,102 +8,103 @@
 ![Supabase](https://img.shields.io/badge/Supabase-green)
 ![Vercel](https://img.shields.io/badge/Deployed-Vercel-black)
 
-**[→ Открыть приложение](https://checkursubs.vercel.app)**
+**[→ Open the app](https://checkursubs.vercel.app)**
 
 ---
 
-## О проекте
+## About
 
-CheckUrSubs помогает держать под контролем все подписки — стриминги, облака, сервисы, операторы связи. Видишь общую сумму, ближайшие списания и разбивку по категориям.
+CheckUrSubs helps you keep track of all your subscriptions — streaming, cloud storage, SaaS tools, mobile plans. See your total spend, upcoming charges, and a breakdown by category.
 
-Работает как PWA — устанавливается на домашний экран iPhone и Android без App Store.
+Works as a PWA — installs to your home screen on iPhone and Android with no App Store required.
 
 ---
 
-## Возможности
+## Features
 
-### Основное
-- 📊 **Дашборд** — общая сумма в месяц, год и день; список всех подписок
-- 📅 **Календарь** — когда и сколько спишется, с разбивкой по дням и суммой месяца
-- ⏰ **Скоро** — ближайшие списания в течение 7 дней
-- 📈 **Аналитика** — расходы по категориям и сервисам с прогресс-барами
-- 🌍 **Мультивалютность** — RUB, USD, EUR, GBP, AED и другие с актуальным курсом
+### Core
+- 📊 **Dashboard** — total per month, year, and day; full subscription list
+- 📅 **Calendar** — see exactly when and how much will be charged, day by day
+- ⏰ **Upcoming** — charges due in the next 7 days
+- 📈 **Analytics** — spending by category and service with progress bars
+- 🌍 **Multi-currency** — RUB, USD, EUR, GBP and more with live exchange rates
+- 🌐 **RU / EN** — full localization with auto-detection by browser language
 
-### Подписки
-- 🔖 **11 категорий** — Развлечения, Работа, Интернет, Игры, Обучение, VPN, Здоровье, Банкинг, Связь, ИИ, Другое
-- 🔍 **Автодополнение** — распознаёт 60+ популярных сервисов, подставляет логотип и категорию
-- 📆 **Месячные и годовые** подписки с корректным расчётом стоимости
-- ↔️ **Свайп-жесты** — влево для удаления, вправо для редактирования
-- ↩️ **Отмена удаления** — 5 секунд чтобы передумать
+### Subscriptions
+- 🔖 **11 categories** — Entertainment, Work, Internet, Games, Education, VPN, Health, Banking, Telecom, AI, Other
+- 🔍 **Autocomplete** — recognizes 60+ popular services, fills in logo and category automatically
+- 📆 **Monthly & yearly** billing with correct cost calculations
+- ↔️ **Swipe gestures** — left to delete, right to edit
+- ↩️ **Undo delete** — 5 seconds to change your mind
 
-### Статусы подписок
-- ✅ **Активна** — считается в суммах и отображается в календаре
-- ⏸️ **На паузе** — не считается, скрыта из календаря
-- 🔬 **Пробный период** — отображается в календаре до даты окончания, не считается в суммах; автоматически становится активной после окончания с датой списания = дата окончания пробного
+### Subscription statuses
+- ✅ **Active** — included in totals and shown in calendar
+- ⏸️ **Paused** — excluded from totals, hidden from calendar
+- 🔬 **Trial** — shown in calendar until trial end date, excluded from totals; automatically becomes active after trial ends
 
 ### UX
-- 🎨 **Тёмный дизайн** — нативный вид, без лишнего
-- 🔐 **Авторизация** — email или Google OAuth
-- 📲 **PWA** — офлайн-кэш, иконка на экране, без браузерного UI
-- 🔔 **Push-уведомления** — напоминание за 3 дня до списания и окончания пробного периода
-- 🧭 **Онбординг** — 6 слайдов с инструкцией, включая установку PWA
-- 📭 **Empty state** — красивый экран когда подписок нет
+- 🎨 **Dark UI** — clean, native feel
+- 🔐 **Auth** — email/password or Google OAuth
+- 📲 **PWA** — offline cache, home screen icon, no browser chrome
+- 🔔 **Push notifications** — reminder 3 days before billing or trial end
+- 🧭 **Onboarding** — 6-slide walkthrough including PWA install instructions
+- 📭 **Empty states** — thoughtful screens when there's nothing to show
 
 ---
 
-## Стек
+## Stack
 
-| Слой | Технология |
-|------|-----------|
+| Layer | Technology |
+|-------|-----------|
 | UI | React 19, Tailwind CSS 4, Framer Motion |
-| Сборка | Vite 7 |
+| Build | Vite 7 |
 | Backend | Supabase (Postgres + Auth + RLS + Edge Functions) |
 | Push | Web Push API + VAPID + Supabase Edge Functions + pg_cron |
-| Мониторинг | Sentry (ошибки + replays) |
-| Аналитика | PostHog (события, воронки, retention) |
-| Деплой | Vercel |
-| Иконки | Lucide React |
+| Monitoring | Sentry (errors + session replays) |
+| Analytics | PostHog (events, funnels, retention) |
+| Deploy | Vercel |
+| Icons | Lucide React |
 
 ---
 
-## Запуск локально
+## Getting Started
 
 ```bash
-# Клонировать
+# Clone
 git clone https://github.com/casablanque-code/CheckUrSubs.git
 cd CheckUrSubs
 
-# Установить зависимости
+# Install dependencies
 npm install
 
-# Создать .env файл
+# Create env file
 cp .env.example .env
-# Вписать VITE_SUPABASE_URL и VITE_SUPABASE_ANON_KEY
+# Fill in VITE_SUPABASE_URL and VITE_SUPABASE_ANON_KEY
 
-# Запустить
+# Start dev server
 npm run dev
 ```
 
 ---
 
-## Переменные окружения
+## Environment Variables
 
 ```env
 VITE_SUPABASE_URL=your_supabase_url
 VITE_SUPABASE_ANON_KEY=your_supabase_anon_key
 ```
 
-Получить их можно в [Supabase Dashboard](https://supabase.com) → Settings → API.
+Get these from [Supabase Dashboard](https://supabase.com) → Settings → API.
 
 ---
 
-## База данных
+## Database
 
-Основная миграция — `supabase_migration.sql`.
-Push-подписки — `push_migration.sql`.
-Запустить в Supabase SQL Editor.
+Main migration — `supabase_migration.sql`.  
+Push subscriptions — `push_migration.sql`.  
+Run both in the Supabase SQL Editor.
 
-Схема таблицы `subscriptions`:
+`subscriptions` table schema:
 
 ```sql
 id            uuid primary key
@@ -111,16 +112,16 @@ user_id       uuid references auth.users
 name          text
 price         numeric
 currency_code text
-date          text        -- день списания, формат "8 Mar"
+date          text        -- billing day, format "8 Mar"
 period        text        -- 'monthly' | 'yearly'
 category      text
 logo          text
 status        text        -- 'active' | 'paused' | 'trial'
-trial_end     date        -- дата окончания пробного периода
+trial_end     date        -- trial end date
 created_at    timestamptz
 ```
 
-Схема таблицы `push_subscriptions`:
+`push_subscriptions` table schema:
 
 ```sql
 id            uuid primary key
@@ -129,34 +130,34 @@ subscription  text        -- JSON Web Push subscription object
 updated_at    timestamptz
 ```
 
-Row Level Security включён — каждый пользователь видит только свои данные.
+Row Level Security is enabled — users only see their own data.
 
 ---
 
-## Push-уведомления
+## Push Notifications
 
-Реализованы через Web Push API + VAPID.
+Implemented via Web Push API + VAPID.
 
-**Деплой Edge Function:**
+**Deploy Edge Function:**
 ```bash
 supabase functions deploy send-push-notifications --project-ref YOUR_REF
 ```
 
-**Секреты в Supabase:**
+**Set secrets in Supabase:**
 ```
 VAPID_PUBLIC_KEY=...
 VAPID_PRIVATE_KEY=...
 ```
 
-**Расписание** — pg_cron запускает функцию каждый день в 10:00 UTC (`push_cron.sql`).
+**Schedule** — pg_cron triggers the function daily at 10:00 UTC (`push_cron.sql`).
 
-Функция отправляет уведомление за 3 дня до:
-- Даты списания активной подписки
-- Окончания пробного периода
+Sends a notification 3 days before:
+- A subscription billing date
+- A trial period end date
 
 ---
 
-## Деплой
+## Deploy
 
 ```bash
 # Preview
@@ -166,27 +167,37 @@ vercel
 vercel --prod
 ```
 
-Env vars добавить в Vercel Dashboard → Settings → Environment Variables.
+Add env vars in Vercel Dashboard → Settings → Environment Variables.
 
 ---
 
-## Установка как PWA
+## Installing as PWA
 
-**iPhone:** открыть в Safari → кнопка «Поделиться» → «На экран домой»
+**iPhone:** open in Safari → tap Share → "Add to Home Screen"
 
-**Android:** открыть в Chrome → меню → «Установить приложение»
+**Android:** open in Chrome → menu → "Install app"
 
-> Уведомления на iOS работают только при установке как PWA (iOS 16.4+)
-
----
-
-## Мониторинг
-
-- **Sentry** — отлавливает JS-ошибки, необработанные Promise rejections, падения Service Worker. Включает Session Replay при ошибках.
-- **PostHog** — отслеживает ключевые события: добавление/удаление подписок, переключение вкладок, смену валюты, прохождение онбординга, включение push.
+> Push notifications on iOS require PWA install (iOS 16.4+)
 
 ---
 
-## Лицензия
+## Service Worker & Updates
+
+The app uses a custom Service Worker (`sw.js`) with:
+- **Automatic update checks** on every app launch (not just every 24h)
+- **Seamless background updates** — new version activates and reloads silently
+- **Cache versioning** — Vite injects a build timestamp on every deploy, old caches are cleared automatically
+- **Network-first** for HTML and navigation; **cache-first** for hashed JS/CSS assets
+
+---
+
+## Monitoring
+
+- **Sentry** — catches JS errors, unhandled Promise rejections, Service Worker failures. Includes Session Replay on errors.
+- **PostHog** — tracks key events: subscription add/delete, tab switches, currency changes, onboarding completion, push opt-in.
+
+---
+
+## License
 
 MIT
