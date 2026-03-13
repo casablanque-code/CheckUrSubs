@@ -42,6 +42,20 @@ export const translations = {
     spent:         (month) => `Потрачено в ${month}`,
     soon:          'Скоро',
     soon_empty:    'Ближайшие 7 дней — без списаний',
+
+    // Импорт / Экспорт
+    io_title:          'Данные',
+    io_subtitle:       'Экспорт и импорт подписок',
+    io_export:         'Экспорт',
+    io_export_csv:     'Скачать CSV',
+    io_export_json:    'Скачать JSON',
+    io_import:         'Импорт',
+    io_import_hint:    'CSV или JSON',
+    io_import_btn:     'Выбрать файл',
+    io_import_ok:      (n) => `Импортировано: ${n}`,
+    io_import_err:     'Ошибка формата файла',
+    io_import_dup:     (n) => `Пропущено дублей: ${n}`,
+
     // Auth
     auth_tagline:       'Контроль подписок под рукой',
     auth_title_login:   'Добро пожаловать',
@@ -219,6 +233,34 @@ export const translations = {
     spent:         (month) => `Spent in ${month}`,
     soon:          'Upcoming',
     soon_empty:    'No payments in the next 7 days',
+
+    // Импорт / Экспорт
+    io_title:          'Данные',
+    io_subtitle:       'Экспорт и импорт подписок',
+    io_export:         'Экспорт',
+    io_export_csv:     'Скачать CSV',
+    io_export_json:    'Скачать JSON',
+    io_import:         'Импорт',
+    io_import_hint:    'CSV или JSON из CheckUrSubs',
+    io_import_btn:     'Выбрать файл',
+    io_import_ok:      (n) => `Импортировано: ${n}`,
+    io_import_err:     'Ошибка формата файла',
+    io_import_dup:     (n) => `Пропущено дублей: ${n}`,
+
+
+    // Import / Export
+    io_title:          'Data',
+    io_subtitle:       'Export and import subscriptions',
+    io_export:         'Export',
+    io_export_csv:     'Download CSV',
+    io_export_json:    'Download JSON',
+    io_import:         'Import',
+    io_import_hint:    'CSV or JSON',
+    io_import_btn:     'Choose file',
+    io_import_ok:      (n) => `Imported: ${n}`,
+    io_import_err:     'Invalid file format',
+    io_import_dup:     (n) => `Skipped duplicates: ${n}`,
+
     // Auth
     auth_tagline:       'Track all your subscriptions',
     auth_title_login:   'Welcome back',
