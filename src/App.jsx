@@ -297,12 +297,39 @@ const urlBase64ToUint8Array = (base64String) => {
 // ═══════════════════════════════════════════════════════════════════════════════
 // APP
 // ═══════════════════════════════════════════════════════════════════════════════
+// ─── Animated Logo Loader ────────────────────────────────────────────────────
+const LogoLoader = () => (
+  <div className="min-h-screen bg-black flex items-center justify-center">
+    <svg width="80" height="80" viewBox="0 0 80 80" fill="none" xmlns="http://www.w3.org/2000/svg">
+      <style>{`
+        @keyframes c3{from{opacity:0;transform:translateY(8px)}to{opacity:1;transform:translateY(0)}}
+        @keyframes c2{from{opacity:0;transform:translateY(8px)}to{opacity:1;transform:translateY(0)}}
+        @keyframes c1{from{opacity:0;transform:translateY(8px)}to{opacity:1;transform:translateY(0)}}
+        @keyframes ck{from{stroke-dashoffset:36;opacity:0}to{stroke-dashoffset:0;opacity:1}}
+        .lc3{animation:c3 .3s ease-out .05s both}
+        .lc2{animation:c2 .3s ease-out .25s both}
+        .lc1{animation:c1 .3s ease-out .45s both}
+        .lck{animation:ck .5s ease-out .9s both;stroke-dasharray:36;stroke-dashoffset:36}
+      `}</style>
+      <g className="lc3"><rect x="14" y="38" width="52" height="28" rx="7" fill="#1a1a1a" stroke="#252525" strokeWidth="1.5"/></g>
+      <g className="lc2"><rect x="14" y="30" width="52" height="28" rx="7" fill="#141414" stroke="#333" strokeWidth="1.5"/></g>
+      <g className="lc1">
+        <rect x="14" y="22" width="52" height="28" rx="7" fill="#0e0e0e" stroke="#484848" strokeWidth="1.5"/>
+        <rect x="22" y="32" width="18" height="3" rx="1.5" fill="#2a2a2a"/>
+        <rect x="22" y="38" width="12" height="3" rx="1.5" fill="#222"/>
+      </g>
+      <path className="lck" d="M44 26 L52 37 L66 20" stroke="white" strokeWidth="3.5" strokeLinecap="round" strokeLinejoin="round" fill="none"/>
+    </svg>
+  </div>
+);
+
 const App = ({ session, toggleLang, lang }) => {
   const userId = session.user.id;
   const t = useT();
 
   const [subscriptions, setSubscriptions] = useState([]);
   const [loading,       setLoading]       = useState(true);
+  const [isOnline,      setIsOnline]      = useState(() => navigator.onLine);
 
   const [currency,     setCurrency]     = useState(() => {
     const saved = localStorage.getItem('currency');
@@ -417,6 +444,8 @@ const App = ({ session, toggleLang, lang }) => {
   useEffect(() => {
     setLoading(true);
     analytics.identify(userId, session.user.email);
+    const MIN_DURATION = 1500; // даём анимации лоадера доиграть до конца
+    const t0 = Date.now();
     supabase
       .from('subscriptions')
       .select('*')
@@ -426,9 +455,20 @@ const App = ({ session, toggleLang, lang }) => {
         if (!error && data) {
           setSubscriptions(data.map(s => ({ ...s, billingDay: extractBillingDay(s.date) })));
         }
-        setLoading(false);
+        const elapsed = Date.now() - t0;
+        const remaining = Math.max(0, MIN_DURATION - elapsed);
+        setTimeout(() => setLoading(false), remaining);
       });
   }, [userId]);
+
+  // ── Онлайн/офлайн детектор ──────────────────────────────────────────────────
+  useEffect(() => {
+    const up   = () => setIsOnline(true);
+    const down = () => setIsOnline(false);
+    window.addEventListener('online',  up);
+    window.addEventListener('offline', down);
+    return () => { window.removeEventListener('online', up); window.removeEventListener('offline', down); };
+  }, []);
 
   // ── Курсы валют ────────────────────────────────────────────────────────────
   useEffect(() => {
@@ -476,8 +516,8 @@ const App = ({ session, toggleLang, lang }) => {
   const totalMonthlyUSD = activeSubs.reduce((a, s) => a + monthly(s), 0);
   const totalYearlyUSD  = totalMonthlyUSD * 12;
 
-  const openAdd  = () => { setEditingSub(null); setIsModalOpen(true); };
-  const openEdit = (s) => { setEditingSub(s);   setIsModalOpen(true); };
+  const openAdd  = () => { if (!isOnline) return; setEditingSub(null); setIsModalOpen(true); };
+  const openEdit = (s) => { if (!isOnline) return; setEditingSub(s);   setIsModalOpen(true); };
 
   // ── CRUD через Supabase ────────────────────────────────────────────────────
   const handleSave = async (payload) => {
@@ -515,6 +555,7 @@ const App = ({ session, toggleLang, lang }) => {
   };
 
   const triggerDelete = async (sub) => {
+    if (!isOnline) return;
     setSubscriptions(prev => prev.filter(s => s.id !== sub.id));
     await supabase.from('subscriptions').delete().eq('id', sub.id);
     analytics.subscriptionDeleted(sub.name, sub.category);
@@ -581,15 +622,24 @@ const App = ({ session, toggleLang, lang }) => {
     if (data) setSubscriptions(prev => [...prev, ...data]);
   };
 
-  if (loading) return (
-    <div className="min-h-screen bg-black flex items-center justify-center">
-      <div className="w-6 h-6 border-2 border-zinc-700 border-t-white rounded-full animate-spin" />
-    </div>
-  );
+  if (loading) return <LogoLoader />;
 
   return (
     <div className="min-h-screen bg-black text-white font-sans flex justify-center select-none">
       <div className="w-full max-w-[450px] min-h-screen border-x border-zinc-900 bg-black flex flex-col relative overflow-hidden">
+
+        {/* ── Офлайн баннер ── */}
+        <AnimatePresence>
+          {!isOnline && (
+            <motion.div
+              initial={{ opacity: 0, y: -4 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -4 }}
+              transition={{ duration: 0.18 }}
+              className="flex items-center justify-center gap-2 px-4 py-2 bg-zinc-900 border-b border-zinc-800">
+              <span className="w-1.5 h-1.5 rounded-full bg-zinc-600 shrink-0" />
+              <p className="text-[11px] text-zinc-500 tracking-wide">{t.offline_banner}</p>
+            </motion.div>
+          )}
+        </AnimatePresence>
 
         {/* Контент со свайпом между вкладками */}
         <div ref={el => { swipeRef.current = el; }} className="flex-1 relative overflow-hidden">
@@ -1200,7 +1250,7 @@ const SUPPORT_LINKS = [
   {
     id: 'boosty',
     label: 'Boosty',
-    hint: 'Карта / СБП',
+    hint: 'Card',
     url: 'https://boosty.to/casablanque/donate',
     bg: 'bg-orange-500/15',
     border: 'border-orange-500/30',
@@ -2191,11 +2241,7 @@ export default function Root() {
     return () => subscription.unsubscribe();
   }, []);
 
-  if (session === undefined) return (
-    <div className="min-h-screen bg-black flex items-center justify-center">
-      <div className="w-6 h-6 border-2 border-zinc-700 border-t-white rounded-full animate-spin" />
-    </div>
-  );
+  if (session === undefined) return <LogoLoader />;
 
   if (!onboarded) return (
     <LangContext.Provider value={lang}>

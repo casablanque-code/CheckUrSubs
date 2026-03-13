@@ -200,7 +200,6 @@ The app uses a custom Service Worker (`sw.js`) with:
 ## Monitoring
 
 - **Sentry** — catches JS errors, unhandled Promise rejections, Service Worker failures. Includes Session Replay on errors.
-- **PostHog** — tracks key events: subscription add/delete, tab switches, currency changes, onboarding completion, push opt-in.
 
 ---
 

@@ -248,6 +248,12 @@ export const translations = {
     io_import_dup:     (n) => `Пропущено дублей: ${n}`,
 
 
+    // Офлайн
+    offline_banner: 'Нет соединения — изменения недоступны',
+
+    // Offline
+    offline_banner: 'No connection — changes unavailable',
+
     // Import / Export
     io_title:          'Data',
     io_subtitle:       'Export and import subscriptions',
