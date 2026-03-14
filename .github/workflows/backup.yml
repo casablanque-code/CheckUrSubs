@@ -1,0 +1,38 @@
+name: Supabase Daily Backup
+
+on:
+  schedule:
+    - cron: '0 0 * * *' # Будет запускаться каждую ночь в 00:00 UTC
+  workflow_dispatch: # Позволяет запустить бэкап вручную в любое время
+
+jobs:
+  backup:
+    runs-on: ubuntu-latest
+
+    steps:
+      # 1. Скачиваем код репозитория
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      # 2. Устанавливаем Node.js (нужен для Supabase CLI)
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+
+      # 3. Устанавливаем Supabase CLI
+      - name: Install Supabase CLI
+        run: npm install -g supabase
+
+      # 4. Делаем дамп базы данных
+      # Мы используем кавычки и переменные из Secrets, чтобы пароль не "светился"
+      run: |
+        supabase db dump --db-url "postgresql://postgres:${{ secrets.SUPABASE_PASSWORD }}@db.${{ secrets.SUPABASE_PROJECT_ID }}.supabase.co:5432/postgres" > daily_backup.sql
+
+      # 5. Сохраняем результат в Артефакты GitHub
+      - name: Upload Backup Artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: supabase-backup
+          path: daily_backup.sql
+          retention-days: 7 # Бэкап будет храниться неделю, потом удалится сам
