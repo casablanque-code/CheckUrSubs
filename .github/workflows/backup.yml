@@ -2,13 +2,12 @@ name: Supabase Daily Backup
 
 on:
   schedule:
-    - cron: '0 0 * * *' # Запуск каждую полночь
-  workflow_dispatch: # Кнопка для ручного запуска
+    - cron: '0 0 * * *' # Каждый день в полночь по UTC
+  workflow_dispatch: # Кнопка для запуска руками
 
 jobs:
   backup:
     runs-on: ubuntu-latest
-
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
@@ -19,6 +18,7 @@ jobs:
           node-version: '20'
 
       - name: Run DB Dump
+        # Мы убрали отдельный шаг установки и запускаем через npx
         run: |
           npx supabase db dump --db-url "postgresql://postgres:${{ secrets.SUPABASE_PASSWORD }}@db.${{ secrets.SUPABASE_PROJECT_ID }}.supabase.co:5432/postgres" > daily_backup.sql
 
