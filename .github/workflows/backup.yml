@@ -2,29 +2,41 @@ name: Supabase Daily Backup
 
 on:
   schedule:
-    - cron: '0 0 * * *'
-  workflow_dispatch:
+    - cron: '0 3 * * *'  # 03:00 UTC — подальше от пиковой нагрузки
+  workflow_dispatch:       # ручной запуск из GitHub UI
 
 jobs:
   backup:
     runs-on: ubuntu-latest
+    timeout-minutes: 15
 
     steps:
-      - name: Checkout code
-        uses: actions/checkout@v4
-
-      - name: Setup Node.js
-        uses: actions/setup-node@v4
-        with:
-          node-version: '20'
-
-      - name: Run DB Dump
+      - name: Dump database
+        env:
+          PGPASSWORD: ${{ secrets.SUPABASE_PASSWORD }}
         run: |
-          npx supabase db dump --db-url "postgresql://postgres:${{ secrets.SUPABASE_PASSWORD }}@db.${{ secrets.SUPABASE_PROJECT_ID }}.supabase.co:6543/postgres" > daily_backup.sql
+          TIMESTAMP=$(date +%Y-%m-%d)
+          pg_dump \
+            --host="db.${{ secrets.SUPABASE_PROJECT_ID }}.supabase.co" \
+            --port=5432 \
+            --username=postgres \
+            --dbname=postgres \
+            --no-owner \
+            --no-acl \
+            --format=plain \
+            | gzip > "backup-${TIMESTAMP}.sql.gz"
+          echo "BACKUP_FILE=backup-${TIMESTAMP}.sql.gz" >> $GITHUB_ENV
 
-      - name: Upload Backup Artifact
+      - name: Upload artifact
         uses: actions/upload-artifact@v4
         with:
-          name: supabase-backup
-          path: daily_backup.sql
-          retention-days: 7
+          name: backup-${{ env.BACKUP_FILE }}
+          path: ${{ env.BACKUP_FILE }}
+          retention-days: 30
+
+      - name: Notify on failure
+        if: failure()
+        uses: actions/github-script@v7
+        with:
+          script: |
+            core.setFailed('Backup failed! Check: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}')
