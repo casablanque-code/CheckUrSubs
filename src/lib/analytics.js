@@ -7,11 +7,20 @@ posthog.init('phc_aR7Z4zGPBQi8cbNj6rdj4OfZgdPV9twNEFjZ4ghVTz', {
   autocapture: false,       // только явные события
 });
 
-export const analytics = {
-  // Идентифицируем юзера после входа
-  identify: (userId, email) => {
-    posthog.identify(userId, { email });
-  },
+
+// export const analytics = {
+//   // Идентифицируем юзера после входа
+//   identify: (userId, email) => {
+//     posthog.identify(userId, { email });
+//   },
+
+  export const analytics = {
+    // Идентифицируем юзера после входа
+    identify: (userId, email) => {
+      posthog.identify(userId, { email });
+      // Привязываем открытие приложения к юзеру
+      posthog.capture('app_opened'); 
+    },
 
   // Онбординг
   onboardingCompleted: () => posthog.capture('onboarding_completed'),
