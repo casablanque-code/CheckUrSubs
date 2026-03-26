@@ -65,6 +65,25 @@ const loadRates = () => {
 const MONTHS_SHORT    = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
 const MONTHS_RU       = ['Январь','Февраль','Март','Апрель','Май','Июнь','Июль','Август','Сентябрь','Октябрь','Ноябрь','Декабрь'];
 const MONTHS_GENITIVE = ['январе','феврале','марте','апреле','мае','июне','июле','августе','сентябре','октябре','ноябре','декабре'];
+
+// Короткие названия месяцев по-русски (для дат вида "14 мар")
+const MONTHS_SHORT_RU = ['янв','фев','мар','апр','май','июн','июл','авг','сен','окт','ноя','дек'];
+
+// Единая утилита форматирования даты из ISO-строки (trial_end и т.п.)
+// Возвращает "14 Mar" для EN и "14 мар" для RU — без смешивания
+const fmtDateFromISO = (isoStr, lang, style = 'short') => {
+  const d = new Date(isoStr);
+  if (isNaN(d)) return '';
+  const day = d.getDate();
+  const m   = d.getMonth();
+  if (style === 'short') {
+    return lang === 'ru' ? `${day} ${MONTHS_SHORT_RU[m]}` : `${day} ${MONTHS_SHORT[m]}`;
+  }
+  // long — для аналитики и датапикера
+  return lang === 'ru'
+    ? `${day} ${MONTHS_RU[m].toLowerCase()}`
+    : `${day} ${MONTHS_SHORT[m]}`;
+};
 const DAYS_RU         = ['Пн','Вт','Ср','Чт','Пт','Сб','Вс'];
 const TABS            = ['home', 'calendar', 'analytics'];
 
@@ -354,6 +373,7 @@ const App = ({ session, toggleLang, lang }) => {
   const [swipeHinted,  setSwipeHinted]  = useState(() => localStorage.getItem('swipeHinted') === '1');
   const [calMonth,     setCalMonth]     = useState(() => new Date().getMonth());
   const [calYear,      setCalYear]      = useState(() => new Date().getFullYear());
+  const [trendRange,   setTrendRange]   = useState(6); // 3 | 6 | 12
 
   const [pushBanner,   setPushBanner]   = useState(false);
 
@@ -372,6 +392,12 @@ const App = ({ session, toggleLang, lang }) => {
 
   const subscribePush = async () => {
     try {
+      // Явно запрашиваем разрешение — часть браузеров не спасает без этого
+      const permission = await Notification.requestPermission();
+      if (permission !== 'granted') {
+        setPushBanner(false);
+        return;
+      }
       const reg = await navigator.serviceWorker.ready;
       const sub = await reg.pushManager.subscribe({
         userVisibleOnly: true,
@@ -380,7 +406,7 @@ const App = ({ session, toggleLang, lang }) => {
       // Сохраняем подписку в Supabase
       await supabase.from('push_subscriptions').upsert({
         user_id: userId,
-        subscription: JSON.stringify(sub),
+        subscription: JSON.stringify(sub.toJSON()), // toJSON() гарантирует { endpoint, keys: { p256dh, auth } }
         updated_at: new Date().toISOString(),
       }, { onConflict: 'user_id' });
       setPushBanner(false);
@@ -556,26 +582,82 @@ const App = ({ session, toggleLang, lang }) => {
 
   const triggerDelete = async (sub) => {
     if (!isOnline) return;
+  
+    // если висел предыдущий toast — просто закрываем его
+    if (toast?.timeoutId) {
+      clearTimeout(toast.timeoutId);
+      setToast(null);
+    }
+  
+    // убираем из UI сразу
     setSubscriptions(prev => prev.filter(s => s.id !== sub.id));
-    await supabase.from('subscriptions').delete().eq('id', sub.id);
+  
+    const { error } = await supabase
+      .from('subscriptions')
+      .delete()
+      .eq('id', sub.id);
+  
+    if (error) {
+      console.error('Delete error:', error);
+  
+      // откат UI, если удаление в БД не прошло
+      setSubscriptions(prev => {
+        const exists = prev.some(s => s.id === sub.id);
+        if (exists) return prev;
+        return [...prev, { ...sub, billingDay: extractBillingDay(sub.date) }];
+      });
+      return;
+    }
+  
     analytics.subscriptionDeleted(sub.name, sub.category);
-    if (toast?.timeoutId) clearTimeout(toast.timeoutId);
-    const timeoutId = window.setTimeout(async () => {
+  
+    const timeoutId = window.setTimeout(() => {
       setToast(null);
     }, 5000);
+  
     setToast({ sub, timeoutId });
   };
-
+  
   const undoDelete = async () => {
     if (!toast) return;
+  
     clearTimeout(toast.timeoutId);
     const sub = toast.sub;
-    const { id, billingDay, ...row } = sub;
-    const { data, error } = await supabase.from('subscriptions').insert({ ...row, user_id: userId }).select().single();
-    if (!error && data) {
-      setSubscriptions(prev => [{ ...data, billingDay: extractBillingDay(data.date) }, ...prev]);
-      analytics.subscriptionDeleteUndone();
+  
+    const row = {
+      id: sub.id,
+      user_id: sub.user_id,
+      name: sub.name,
+      price: sub.price,
+      currency_code: sub.currency_code,
+      date: sub.date,
+      period: sub.period,
+      category: sub.category,
+      logo: sub.logo || '',
+      status: sub.status || 'active',
+      trial_end: sub.trial_end || null,
+      created_at: sub.created_at,
+    };
+  
+    const { data, error } = await supabase
+      .from('subscriptions')
+      .insert(row)
+      .select()
+      .single();
+  
+    if (error) {
+      console.error('Undo insert error:', error);
+      setToast(null);
+      return;
     }
+  
+    setSubscriptions(prev => {
+      const exists = prev.some(s => s.id === data.id);
+      if (exists) return prev;
+      return [...prev, { ...data, billingDay: extractBillingDay(data.date) }];
+    });
+  
+    analytics.subscriptionDeleteUndone();
     setToast(null);
   };
 
@@ -875,6 +957,104 @@ const App = ({ session, toggleLang, lang }) => {
                   <div className="h-full w-full bg-gradient-to-r from-purple-500 via-fuchsia-500 to-blue-500 rounded-full" />
                 </div>
               </div>
+
+              {/* ── Тренд расходов по месяцам ── */}
+              {(() => {
+                const now = new Date();
+                const monthLabels = lang === 'ru' ? MONTHS_SHORT_RU : MONTHS_SHORT;
+
+                // Строим диапазон месяцев (trendRange штук, включая текущий)
+                const months = Array.from({ length: trendRange }, (_, i) => {
+                  const d = new Date(now.getFullYear(), now.getMonth() - (trendRange - 1 - i), 1);
+                  return { year: d.getFullYear(), month: d.getMonth() };
+                });
+
+                // Для каждого месяца считаем реальные списания по датам биллинга
+                const monthlyTotals = months.map(({ month, year }) => {
+                  return subscriptions.reduce((sum, s) => {
+                    if (s.status === 'paused') return sum;
+                    if (s.status === 'trial') return sum; // пробные не списываются
+
+                    const billingDay   = extractBillingDay(s.date);
+                    const billingMonth = extractBillingMonth(s.date); // null для месячных
+
+                    if (!billingDay) return sum;
+
+                    if (s.period === 'monthly') {
+                      // Месячная — списывается каждый месяц
+                      return sum + toUSD(s.price ?? 0, s.currency_code || 'USD', rates);
+                    }
+
+                    if (s.period === 'yearly') {
+                      // Годовая — только в тот месяц когда реально списывается
+                      if (billingMonth !== null && billingMonth === month) {
+                        return sum + toUSD(s.price ?? 0, s.currency_code || 'USD', rates);
+                      }
+                      return sum;
+                    }
+
+                    return sum;
+                  }, 0);
+                });
+
+                const maxVal     = Math.max(...monthlyTotals, 0.01);
+                const totalRange = monthlyTotals.reduce((a, v) => a + v, 0);
+
+                return (
+                  <div className="bg-[#1C1C1E] rounded-3xl border border-zinc-800/60 p-5">
+                    {/* Заголовок + переключатель */}
+                    <div className="flex items-center justify-between mb-4">
+                      <p className="text-xs text-zinc-500 uppercase tracking-[0.16em]">{t.trend_title}</p>
+                      <div className="flex items-center gap-1 bg-zinc-800 rounded-xl p-0.5">
+                        {[3, 6, 12].map(r => (
+                          <button key={r} onClick={() => setTrendRange(r)}
+                            className={`text-[10px] font-semibold px-2.5 py-1 rounded-lg transition ${
+                              trendRange === r ? 'bg-zinc-600 text-white' : 'text-zinc-500 hover:text-zinc-300'
+                            }`}>
+                            {r}{lang === 'ru' ? 'м' : 'm'}
+                          </button>
+                        ))}
+                      </div>
+                    </div>
+
+                    {/* Бары */}
+                    <div className="flex items-end gap-1 h-16">
+                      {monthlyTotals.map((val, i) => {
+                        const isCurrentMonth = i === trendRange - 1;
+                        const heightPct = maxVal > 0 ? Math.max(5, (val / maxVal) * 100) : 5;
+                        return (
+                          <div key={i} className="flex-1 flex flex-col items-center gap-1">
+                            <div className="w-full flex items-end" style={{ height: '48px' }}>
+                              <motion.div
+                                key={`${trendRange}-${i}`}
+                                initial={{ height: 0 }}
+                                animate={{ height: `${heightPct}%` }}
+                                transition={{ duration: 0.4, ease: 'easeOut', delay: i * 0.03 }}
+                                className={`w-full rounded-md ${isCurrentMonth ? 'bg-purple-500' : val > 0 ? 'bg-zinc-600' : 'bg-zinc-800'}`}
+                                style={{ minHeight: '3px' }}
+                              />
+                            </div>
+                            {/* Показываем метку только если баров не слишком много */}
+                            {(trendRange <= 6 || i % 2 === 0) && (
+                              <span className={`text-[8px] font-medium leading-none ${isCurrentMonth ? 'text-purple-400' : 'text-zinc-600'}`}>
+                                {monthLabels[months[i].month]}
+                              </span>
+                            )}
+                          </div>
+                        );
+                      })}
+                    </div>
+
+                    {/* Итог за период */}
+                    <div className="flex justify-between items-center mt-3 pt-3 border-t border-zinc-800">
+                      <span className="text-[10px] text-zinc-500">
+                        {lang === 'ru' ? `За ${trendRange} мес.` : `Last ${trendRange}mo`}
+                      </span>
+                      <span className="text-sm font-semibold">{fmt(totalRange)}</span>
+                    </div>
+                  </div>
+                );
+              })()}
               {byCategory.length > 0 && (
                 <div className="bg-[#1C1C1E] rounded-3xl border border-zinc-800/60 p-5 space-y-4">
                   <p className="text-xs text-zinc-500 uppercase tracking-[0.16em]">{t.by_categories}</p>
@@ -946,7 +1126,7 @@ const App = ({ session, toggleLang, lang }) => {
                           <LogoIcon sub={sub} size="sm" />
                           <div className="min-w-0">
                             <p className="text-sm font-medium truncate">{sub.name}</p>
-                            {sub.trial_end && <p className="text-[10px] text-zinc-500">{new Date(sub.trial_end).toLocaleDateString(lang === 'ru' ? 'ru-RU' : 'en-US', { day: 'numeric', month: 'long' })}</p>}
+                            {sub.trial_end && <p className="text-[10px] text-zinc-500">{fmtDateFromISO(sub.trial_end, lang, 'long')}</p>}
                           </div>
                         </div>
                         <p className="text-sm text-zinc-500 shrink-0">—</p>
@@ -1261,6 +1441,22 @@ const SUPPORT_LINKS = [
       </svg>
     ),
   },
+
+  {
+    id: 'CloudTips',
+    label: 'CloudTips',
+    hint: 'Card/SBP',
+    url: 'https://pay.cloudtips.ru/p/18fa81b4',
+    bg: 'bg-blue-500/15',
+    border: 'border-blue-500/30',
+    color: 'text-blue-400',
+    icon: () => (
+      <svg viewBox="0 0 24 24" className="w-4 h-4" fill="currentColor">
+        <path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm-1 14H9V8h2v8zm4 0h-2V8h2v8z"/>
+      </svg>
+    ),
+  },
+
   {
     id: 'usdt',
     label: 'USDT',
@@ -1742,12 +1938,41 @@ const CategoryBadge = ({ cat, tiny = false }) => {
 const SoonCard = ({ sub, fmtOriginal }) => {
   const t    = useT();
   const lang = useLang();
-  const cat = sub.category ? getCat(sub.category) : null;
+  const cat  = sub.category ? getCat(sub.category) : null;
+
+  // Считаем сколько дней до списания
+  const daysLeft = (() => {
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+    let target;
+    if (sub.status === 'trial' && sub.trial_end) {
+      target = new Date(sub.trial_end);
+      target.setHours(0, 0, 0, 0);
+    } else {
+      const day = sub.billingDay ?? extractBillingDay(sub.date);
+      if (!day) return null;
+      target = new Date(today.getFullYear(), today.getMonth(), day);
+      if (target < today) target.setMonth(target.getMonth() + 1);
+    }
+    return Math.round((target - today) / 86400000);
+  })();
+
+  const daysLabel = (() => {
+    if (daysLeft === null) return null;
+    if (daysLeft === 0) return lang === 'ru' ? 'сегодня' : 'today';
+    if (daysLeft === 1) return lang === 'ru' ? 'завтра'  : 'tomorrow';
+    return lang === 'ru' ? `через ${daysLeft} дн.` : `in ${daysLeft}d`;
+  })();
+
   return (
     <div className="w-[168px] bg-[#1C1C1E] rounded-[28px] p-5 border border-zinc-800 active:scale-[0.97] transition shrink-0 flex flex-col">
       <div className="flex justify-between items-start mb-4">
         <LogoIcon sub={sub} size="md" />
-        <span className="text-[10px] font-bold text-white bg-zinc-800 px-2 py-1 rounded-xl border border-zinc-700 shrink-0 ml-2">{sub.date}</span>
+        <span className={`text-[10px] font-bold px-2 py-1 rounded-xl border shrink-0 ml-2 ${
+          daysLeft === 0 ? 'text-red-400 bg-red-500/15 border-red-500/30' :
+          daysLeft === 1 ? 'text-amber-400 bg-amber-500/15 border-amber-500/30' :
+          'text-white bg-zinc-800 border-zinc-700'
+        }`}>{daysLabel ?? sub.date}</span>
       </div>
       <p className="font-semibold text-sm leading-snug mb-2 flex-1" style={{ display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical', overflow: 'hidden' }}>{sub.name}</p>
       <div className="flex items-center justify-between gap-1">
@@ -1821,7 +2046,7 @@ const SubscriptionRow = ({ sub, fmt, fmtOriginal, monthly, onEdit, onDelete }) =
           <p className="text-xs text-zinc-500 truncate">
             {fmtOriginal(sub)} / {sub.period === 'yearly' ? t.sub_per_year : t.sub_per_month}
             {sub.date && sub.date !== '—' && ` · ${sub.date}`}
-            {sub.status === 'trial' && sub.trial_end && ` · ${new Date(sub.trial_end).toLocaleDateString(lang === 'en' ? 'en-US' : 'ru-RU', { day: 'numeric', month: 'short' })}`}
+            {sub.status === 'trial' && sub.trial_end && ` · ${fmtDateFromISO(sub.trial_end, lang)}`}
           </p>
         </div>
       </motion.div>
@@ -1904,7 +2129,7 @@ const DatePicker = ({ value, onChange, label }) => {
         <span className="text-xs text-amber-400 font-medium">{label}</span>
         <span className="ml-auto text-sm">
           {parsed
-            ? <span className="text-zinc-200">{parsed.toLocaleDateString(lang === 'en' ? 'en-US' : 'ru-RU', { day: 'numeric', month: 'long' })}</span>
+            ? <span className="text-zinc-200">{fmtDateFromISO(value, lang, 'long')}</span>
             : <span className="text-zinc-600">{t.datepicker_choose}</span>}
         </span>
       </div>

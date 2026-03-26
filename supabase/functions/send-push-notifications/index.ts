@@ -3,78 +3,47 @@
 // Отправляет push за 3 дня до списания подписки
 
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
+import webpush from 'npm:web-push';
 
 // Web Push через VAPID
 const VAPID_PUBLIC_KEY  = Deno.env.get('VAPID_PUBLIC_KEY')!;
 const VAPID_PRIVATE_KEY = Deno.env.get('VAPID_PRIVATE_KEY')!;
 const VAPID_SUBJECT     = 'mailto:support@checkursubs.app';
 
-// ─── VAPID JWT helper ─────────────────────────────────────────────────────────
-async function makeVapidToken(audience: string): Promise<string> {
-  const header  = { alg: 'ES256', typ: 'JWT' };
-  const payload = {
-    aud: audience,
-    exp: Math.floor(Date.now() / 1000) + 12 * 3600,
-    sub: VAPID_SUBJECT,
-  };
-  const encode = (obj: object) =>
-    btoa(JSON.stringify(obj)).replace(/=/g, '').replace(/\+/g, '-').replace(/\//g, '_');
-  const sigInput = `${encode(header)}.${encode(payload)}`;
+webpush.setVapidDetails(VAPID_SUBJECT, VAPID_PUBLIC_KEY, VAPID_PRIVATE_KEY);
 
-  const keyBytes = Uint8Array.from(
-    atob(VAPID_PRIVATE_KEY.replace(/-/g, '+').replace(/_/g, '/') + '=='), c => c.charCodeAt(0)
-  );
-  const cryptoKey = await crypto.subtle.importKey(
-    'pkcs8',
-    // Оборачиваем raw private key в PKCS8 структуру для ES256 (secp256r1)
-    wrapInPkcs8(keyBytes),
-    { name: 'ECDSA', namedCurve: 'P-256' },
-    false,
-    ['sign']
-  );
-  const sig = await crypto.subtle.sign(
-    { name: 'ECDSA', hash: 'SHA-256' },
-    cryptoKey,
-    new TextEncoder().encode(sigInput)
-  );
-  const sigB64 = btoa(String.fromCharCode(...new Uint8Array(sig)))
-    .replace(/=/g, '').replace(/\+/g, '-').replace(/\//g, '_');
-  return `${sigInput}.${sigB64}`;
-}
-
-function wrapInPkcs8(rawKey: Uint8Array): ArrayBuffer {
-  // EC private key PKCS8 wrapper for P-256
-  const prefix = new Uint8Array([
-    0x30, 0x81, 0x87, 0x02, 0x01, 0x00, 0x30, 0x13,
-    0x06, 0x07, 0x2a, 0x86, 0x48, 0xce, 0x3d, 0x02,
-    0x01, 0x06, 0x08, 0x2a, 0x86, 0x48, 0xce, 0x3d,
-    0x03, 0x01, 0x07, 0x04, 0x6d, 0x30, 0x6b, 0x02,
-    0x01, 0x01, 0x04, 0x20,
-  ]);
-  const result = new Uint8Array(prefix.length + rawKey.length + 2);
-  result.set(prefix);
-  result.set(rawKey, prefix.length);
-  return result.buffer;
-}
-
+// ─── sendPush: шифрует payload и отправляет по Web Push (RFC 8291) ─────────────
 async function sendPush(subscription: any, payload: object): Promise<boolean> {
   const sub = typeof subscription === 'string' ? JSON.parse(subscription) : subscription;
-  const endpoint = sub.endpoint;
-  const audience = new URL(endpoint).origin;
-  const token = await makeVapidToken(audience);
+  try {
+    await webpush.sendNotification(sub, JSON.stringify(payload));
+    return true;
+  } catch (e: any) {
+    // 410 Gone / 404 — подписка устарела, можно удалять из БД
+    if (e?.statusCode === 410 || e?.statusCode === 404) {
+      console.warn('Stale subscription:', sub.endpoint);
+    } else {
+      console.error('Push error:', e?.statusCode, e?.body);
+    }
+    return false;
+  }
+}
 
-  const body = new TextEncoder().encode(JSON.stringify(payload));
+// ─── Вспомогательные типы ─────────────────────────────────────────────────────
+const MONTHS_SHORT = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
 
-  const res = await fetch(endpoint, {
-    method: 'POST',
-    headers: {
-      'Authorization': `vapid t=${token},k=${VAPID_PUBLIC_KEY}`,
-      'Content-Type': 'application/json',
-      'TTL': '86400',
-    },
-    body,
-  });
-  return res.ok || res.status === 201;
+// Горизонты уведомлений: за сколько дней и какой текст
+const HORIZONS = [
+  { days: 3, label: (name: string) => `через 3 дня` },
+  { days: 2, label: (name: string) => `послезавтра`  },
+  { days: 1, label: (name: string) => `завтра`       },
+] as const;
+
+// Возвращает день и месяц целевой даты (today + offsetDays)
+function targetDate(today: Date, offsetDays: number) {
+  const d = new Date(today);
+  d.setDate(today.getDate() + offsetDays);
+  return { day: d.getDate(), month: d.getMonth() };
 }
 
 // ─── Основная логика ──────────────────────────────────────────────────────────
@@ -84,13 +53,10 @@ Deno.serve(async () => {
     Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!
   );
 
-  const today     = new Date();
-  const inThreeDays = new Date(today);
-  inThreeDays.setDate(today.getDate() + 3);
-  const targetDay   = inThreeDays.getDate();
-  const targetMonth = inThreeDays.getMonth(); // 0-indexed
+  const today = new Date();
 
-  const MONTHS_SHORT = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+  // Предвычисляем все три горизонта сразу
+  const horizons = HORIZONS.map(h => ({ ...h, ...targetDate(today, h.days) }));
 
   // Получаем все push-подписки
   const { data: pushSubs } = await supabase
@@ -102,7 +68,6 @@ Deno.serve(async () => {
   let sent = 0;
 
   for (const ps of pushSubs) {
-    // Получаем подписки юзера
     const { data: subs } = await supabase
       .from('subscriptions')
       .select('*')
@@ -110,53 +75,70 @@ Deno.serve(async () => {
 
     if (!subs?.length) continue;
 
-    const toNotify: string[] = [];
+    // Собираем уведомления по всем горизонтам
+    // Структура: Map<horizonDays, string[]> — чтобы не слать три пуша подряд,
+    // а объединить подписки одного горизонта в одно сообщение
+    const byHorizon = new Map<number, string[]>();
 
     for (const s of subs) {
-      // Пропускаем паузные
       if (s.status === 'paused') continue;
 
       if (s.status === 'trial' && s.trial_end) {
-        // Пробные — уведомляем за 3 дня до trial_end
         const end = new Date(s.trial_end);
-        if (end.getDate() === targetDay && end.getMonth() === targetMonth) {
-          toNotify.push(`⏰ Пробный период «${s.name}» заканчивается через 3 дня`);
+        const endDay   = end.getDate();
+        const endMonth = end.getMonth();
+
+        for (const h of horizons) {
+          if (endDay === h.day && endMonth === h.month) {
+            const list = byHorizon.get(h.days) ?? [];
+            list.push(`⏰ Пробный период «${s.name}» заканчивается ${h.label(s.name)}`);
+            byHorizon.set(h.days, list);
+          }
         }
         continue;
       }
 
-      // Активные — уведомляем за 3 дня до списания
       if (!s.date) continue;
-      const parts = String(s.date).trim().split(' ');
+      const parts        = String(s.date).trim().split(' ');
       const billingDay   = parseInt(parts[0]);
       const billingMonth = parts[1] ? MONTHS_SHORT.indexOf(parts[1]) : -1;
 
-      if (s.period === 'monthly') {
-        if (billingDay === targetDay) {
-          toNotify.push(`💳 «${s.name}» спишется через 3 дня`);
-        }
-      } else if (s.period === 'yearly') {
-        if (billingDay === targetDay && billingMonth === targetMonth) {
-          toNotify.push(`💳 «${s.name}» спишется через 3 дня`);
+      for (const h of horizons) {
+        const matches =
+          s.period === 'monthly'
+            ? billingDay === h.day
+            : s.period === 'yearly'
+              ? billingDay === h.day && billingMonth === h.month
+              : false;
+
+        if (matches) {
+          const list = byHorizon.get(h.days) ?? [];
+          list.push(`💳 «${s.name}» спишется ${h.label(s.name)}`);
+          byHorizon.set(h.days, list);
         }
       }
     }
 
-    if (!toNotify.length) continue;
+    if (!byHorizon.size) continue;
 
-    // Отправляем одно уведомление со всеми подписками
-    const body = toNotify.length === 1
-      ? toNotify[0]
-      : `${toNotify[0]} и ещё ${toNotify.length - 1}`;
+    // Отправляем отдельный пуш для каждого горизонта
+    // (3 дня, 2 дня, 1 день — разные tag, не перекрывают друг друга)
+    for (const [days, messages] of byHorizon) {
+      const body = messages.length === 1
+        ? messages[0]
+        : `${messages[0]} и ещё ${messages.length - 1}`;
 
-    const ok = await sendPush(ps.subscription, {
-      title: 'CheckUrSubs',
-      body,
-      tag:   `payment-${ps.user_id}-${targetDay}`,
-      url:   '/',
-    });
+      const { day } = horizons.find(h => h.days === days)!;
 
-    if (ok) sent++;
+      const ok = await sendPush(ps.subscription, {
+        title: 'CheckUrSubs',
+        body,
+        tag:   `payment-${ps.user_id}-d${days}-${day}`,
+        url:   '/',
+      });
+
+      if (ok) sent++;
+    }
   }
 
   return new Response(JSON.stringify({ sent }), {
