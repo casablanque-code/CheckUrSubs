@@ -2406,11 +2406,19 @@ const SubModal = ({ initial, currency, onSave, onClose }) => {
           {initial && (() => {
             const entry = getCatalogEntry(initial.name);
             if (!entry?.cancelUrl) return null;
+            const labelPre  = lang === 'ru' ? 'Как '          : 'How to ';
+            const labelLink = lang === 'ru' ? 'отменить подписку' : 'cancel subscription';
             return (
               <div className="rounded-2xl border border-zinc-800 bg-zinc-900/60 overflow-hidden">
                 <div className="flex items-center gap-3 px-4 py-3 border-b border-zinc-800">
                   <X className="w-3.5 h-3.5 text-zinc-500 shrink-0" />
-                  <span className="text-xs text-zinc-400">{t.cancel_how ?? (lang === 'ru' ? 'Как отменить подписку' : 'How to cancel')}</span>
+                  <span className="text-xs text-zinc-400">
+                    {labelPre}
+                    <a href={entry.cancelUrl} target="_blank" rel="noopener noreferrer"
+                      className="text-red-400 hover:text-red-300 transition underline underline-offset-2">
+                      {labelLink}
+                    </a>
+                  </span>
                 </div>
                 <div className="px-4 py-3 space-y-2">
                   {entry.cancelSteps.map((step, i) => (
@@ -2419,11 +2427,6 @@ const SubModal = ({ initial, currency, onSave, onClose }) => {
                       <span className="text-xs text-zinc-400 leading-relaxed">{step}</span>
                     </div>
                   ))}
-                  <a href={entry.cancelUrl} target="_blank" rel="noopener noreferrer"
-                    className="flex items-center justify-center gap-1.5 mt-3 w-full text-xs font-semibold text-red-400 bg-red-500/10 border border-red-500/20 rounded-xl py-2 active:scale-95 transition">
-                    <X className="w-3 h-3" />
-                    {t.cancel_open ?? (lang === 'ru' ? `Открыть страницу отмены` : `Open cancellation page`)}
-                  </a>
                 </div>
               </div>
             );
