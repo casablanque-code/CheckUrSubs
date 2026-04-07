@@ -128,6 +128,13 @@ export const translations = {
     // Аватар меню
     logout: 'Выйти',
 
+    delete_account: 'Удалить аккаунт',
+    delete_account_title: 'Удалить аккаунт?',
+    delete_account_desc: 'Все подписки и данные будут удалены навсегда. Это действие нельзя отменить.',
+    delete_type_to_confirm: 'Введите {word} для подтверждения',
+    delete_account_confirm: 'Удалить всё',
+    delete_account_loading: 'Удаляем...',
+
     // Категории
     cat_entertainment: 'Развлечения',
     cat_work:          'Работа',
@@ -339,6 +346,14 @@ export const translations = {
 
     // Avatar menu
     logout: 'Log out',
+
+    delete_account: 'Delete account',
+    delete_account_title: 'Delete account?',
+    delete_account_desc: 'All your subscriptions and data will be permanently erased. This cannot be undone.',
+    elete_confirm_word: 'DELETE',
+    delete_type_to_confirm: 'Type {word} to confirm',
+    delete_account_confirm: 'Delete everything',
+    delete_account_loading: 'Deleting...',
 
     // Categories
     cat_entertainment: 'Entertainment',

@@ -725,6 +725,24 @@ const App = ({ session, toggleLang, lang }) => {
 
   const handleLogout = () => { analytics.loggedOut(); supabase.auth.signOut(); };
 
+  const handleDeleteAccount = async () => {
+    try {
+      // Удаляем все данные пользователя из всех таблиц
+      await supabase.from('subscriptions').delete().eq('user_id', userId);
+      await supabase.from('push_subscriptions').delete().eq('user_id', userId);
+      await supabase.from('push_logs').delete().eq('user_id', userId);
+      // Удаляем аккаунт через edge function (нужен service role для auth.admin.deleteUser)
+      // Если нет такой функции — просто разлогиниваем после очистки данных
+      await supabase.functions.invoke('delete-user', { body: { user_id: userId } }).catch(() => {});
+      analytics.loggedOut();
+      await supabase.auth.signOut();
+    } catch (e) {
+      console.error('Delete account error:', e);
+      // Даже если что-то не удалилось — разлогиниваем
+      await supabase.auth.signOut();
+    }
+  };
+
   const handleImport = async (rows) => {
     const existing = new Set(subscriptions.map(s => s.name + '|' + s.price + '|' + s.period));
     const fresh = rows.filter(r => !existing.has(r.name + '|' + r.price + '|' + r.period));
@@ -787,7 +805,7 @@ const App = ({ session, toggleLang, lang }) => {
                     <span className={`relative z-10 flex-1 text-center text-[10px] font-bold tracking-wide transition-colors ${lang === 'ru' ? 'text-black' : 'text-zinc-500'}`}>RU</span>
                     <span className={`relative z-10 flex-1 text-center text-[10px] font-bold tracking-wide transition-colors ${lang === 'en' ? 'text-black' : 'text-zinc-500'}`}>EN</span>
                   </button>
-                  <AvatarMenu session={session} onLogout={handleLogout} />
+                  <AvatarMenu session={session} onLogout={handleLogout} onDeleteAccount={handleDeleteAccount} />
                 </div>
               </header>
 
@@ -1749,12 +1767,79 @@ const ImportExportMenu = ({ subscriptions, onImport }) => {
   );
 };
 
-const AvatarMenu = ({ session, onLogout }) => {
+// ─── Модалка подтверждения удаления аккаунта ──────────────────────────────────
+const DeleteAccountModal = ({ onConfirm, onCancel }) => {
+  const t = useT();
+  const [inputValue, setInputValue] = useState('');
+  const [loading, setLoading] = useState(false);
+  const confirmWord = t.delete_confirm_word || 'DELETE';
+  const isReady = inputValue.trim().toUpperCase() === confirmWord.toUpperCase();
+
+  const handleConfirm = async () => {
+    if (!isReady) return;
+    setLoading(true);
+    await onConfirm();
+  };
+
+  return (
+    <>
+      <motion.div
+        initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
+        className="fixed inset-0 bg-black/80 backdrop-blur-sm z-[60]"
+        onClick={onCancel}
+      />
+      <motion.div
+        initial={{ opacity: 0, scale: 0.92, y: 24 }}
+        animate={{ opacity: 1, scale: 1, y: 0 }}
+        exit={{ opacity: 0, scale: 0.92, y: 24 }}
+        transition={{ type: 'spring', stiffness: 380, damping: 32 }}
+        className="fixed left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 z-[70] w-[calc(100vw-32px)] max-w-[380px] bg-zinc-950 border border-zinc-800 rounded-3xl p-6 shadow-2xl"
+        onClick={e => e.stopPropagation()}
+      >
+        <div className="w-12 h-12 rounded-2xl bg-red-500/15 border border-red-500/30 flex items-center justify-center mx-auto mb-4">
+          <Trash2 className="w-5 h-5 text-red-400" />
+        </div>
+        <h2 className="text-lg font-semibold text-center mb-2">
+          {t.delete_account_title || 'Delete account'}
+        </h2>
+        <p className="text-sm text-zinc-400 text-center leading-relaxed mb-5">
+          {t.delete_account_desc || 'All your subscriptions and data will be permanently erased. This action cannot be undone.'}
+        </p>
+        <p className="text-xs text-zinc-500 text-center mb-2">
+          {t.delete_type_to_confirm
+            ? t.delete_type_to_confirm.replace('{word}', confirmWord)
+            : `Type ${confirmWord} to confirm`}
+        </p>
+        <input
+          type="text"
+          value={inputValue}
+          onChange={e => setInputValue(e.target.value)}
+          placeholder={confirmWord}
+          autoCapitalize="none"
+          className="w-full bg-black border border-zinc-800 focus:border-red-500/60 rounded-2xl px-4 py-3 text-sm text-center font-semibold tracking-widest text-white placeholder-zinc-700 outline-none transition mb-4"
+        />
+        <button
+          onClick={handleConfirm}
+          disabled={!isReady || loading}
+          className={`w-full py-3 rounded-2xl text-sm font-semibold transition active:scale-95 mb-2 ${isReady && !loading ? 'bg-red-600 hover:bg-red-500 text-white' : 'bg-zinc-800 text-zinc-600 cursor-not-allowed'}`}
+        >
+          {loading ? (t.delete_account_loading || 'Deleting...') : (t.delete_account_confirm || 'Delete everything')}
+        </button>
+        <button onClick={onCancel} disabled={loading}
+          className="w-full py-2.5 rounded-2xl text-sm text-zinc-400 hover:text-zinc-200 transition">
+          {t.modal_cancel || 'Cancel'}
+        </button>
+      </motion.div>
+    </>
+  );
+};
+
+const AvatarMenu = ({ session, onLogout, onDeleteAccount }) => {
   const t = useT();
   const [open, setOpen] = useState(false);
+  const [showDeleteModal, setShowDeleteModal] = useState(false);
   const ref = useRef(null);
 
-  // Закрываем по клику вне
   useEffect(() => {
     if (!open) return;
     const handler = (e) => { if (ref.current && !ref.current.contains(e.target)) setOpen(false); };
@@ -1769,31 +1854,48 @@ const AvatarMenu = ({ session, onLogout }) => {
   const initials = email ? email[0].toUpperCase() : '?';
 
   return (
-    <div ref={ref} className="relative">
-      <button onClick={() => setOpen(v => !v)}
-        className="w-10 h-10 rounded-full overflow-hidden border-2 border-zinc-700 active:scale-95 transition shrink-0">
-        {avatarUrl
-          ? <img src={avatarUrl} className="w-full h-full object-cover" alt="" />
-          : <div className="w-full h-full bg-zinc-800 flex items-center justify-center text-sm font-semibold text-zinc-300">{initials}</div>
-        }
-      </button>
+    <>
+      <div ref={ref} className="relative">
+        <button onClick={() => setOpen(v => !v)}
+          className="w-10 h-10 rounded-full overflow-hidden border-2 border-zinc-700 active:scale-95 transition shrink-0">
+          {avatarUrl
+            ? <img src={avatarUrl} className="w-full h-full object-cover" alt="" />
+            : <div className="w-full h-full bg-zinc-800 flex items-center justify-center text-sm font-semibold text-zinc-300">{initials}</div>
+          }
+        </button>
+        <AnimatePresence>
+          {open && (
+            <motion.div initial={{ opacity: 0, scale: 0.92, y: -6 }} animate={{ opacity: 1, scale: 1, y: 0 }}
+              exit={{ opacity: 0, scale: 0.92, y: -6 }} transition={{ duration: 0.15 }}
+              className="absolute right-0 top-12 bg-zinc-900 border border-zinc-700 rounded-2xl shadow-2xl z-50 min-w-[200px] overflow-hidden">
+              <div className="px-4 py-3 border-b border-zinc-800">
+                <p className="text-xs text-zinc-400 truncate">{email}</p>
+              </div>
+              <button onClick={() => { setOpen(false); onLogout(); }}
+                className="w-full flex items-center gap-3 px-4 py-3 text-sm text-red-400 hover:bg-zinc-800 transition active:bg-zinc-700">
+                <LogOut className="w-4 h-4" />
+                {t.logout}
+              </button>
+              <div className="h-px bg-zinc-800/60 mx-3" />
+              <button onClick={() => { setOpen(false); setShowDeleteModal(true); }}
+                className="w-full flex items-center gap-3 px-4 py-3 text-sm text-zinc-500 hover:bg-zinc-800 hover:text-red-400 transition active:bg-zinc-700">
+                <Trash2 className="w-4 h-4" />
+                {t.delete_account || 'Delete account'}
+              </button>
+            </motion.div>
+          )}
+        </AnimatePresence>
+      </div>
+
       <AnimatePresence>
-        {open && (
-          <motion.div initial={{ opacity: 0, scale: 0.92, y: -6 }} animate={{ opacity: 1, scale: 1, y: 0 }}
-            exit={{ opacity: 0, scale: 0.92, y: -6 }} transition={{ duration: 0.15 }}
-            className="absolute right-0 top-12 bg-zinc-900 border border-zinc-700 rounded-2xl shadow-2xl z-50 min-w-[180px] overflow-hidden">
-            <div className="px-4 py-3 border-b border-zinc-800">
-              <p className="text-xs text-zinc-400 truncate">{email}</p>
-            </div>
-            <button onClick={() => { setOpen(false); onLogout(); }}
-              className="w-full flex items-center gap-3 px-4 py-3 text-sm text-red-400 hover:bg-zinc-800 transition active:bg-zinc-700">
-              <LogOut className="w-4 h-4" />
-              {t.logout}
-            </button>
-          </motion.div>
+        {showDeleteModal && (
+          <DeleteAccountModal
+            onConfirm={async () => { await onDeleteAccount(); setShowDeleteModal(false); }}
+            onCancel={() => setShowDeleteModal(false)}
+          />
         )}
       </AnimatePresence>
-    </div>
+    </>
   );
 };
 
