@@ -409,6 +409,7 @@ const App = ({ session, toggleLang, lang }) => {
     }
   }, [lang]);
   const [toast,        setToast]        = useState(null);
+  const [confirmSub,   setConfirmSub]   = useState(null);
   const [sortBy,       setSortBy]       = useState('name');
   const [searchQuery,  setSearchQuery]  = useState('');
   const [swipeHinted,  setSwipeHinted]  = useState(() => localStorage.getItem('swipeHinted') === '1');
@@ -947,7 +948,7 @@ const App = ({ session, toggleLang, lang }) => {
                     )}
                     {sortedSubs.map(sub => (
                       <SubscriptionRow key={sub.id} sub={sub} fmt={fmt} fmtOriginal={fmtOriginal} monthly={monthly}
-                        onEdit={() => openEdit(sub)} onDelete={() => triggerDelete(sub)} />
+                        onEdit={() => openEdit(sub)} onDelete={() => setConfirmSub(sub)} />
                     ))}
                     {sortedSubs.length === 0 && searchQuery && (
                       <div className="flex flex-col items-center gap-2 px-4 py-8 text-center">
@@ -1253,10 +1254,45 @@ const App = ({ session, toggleLang, lang }) => {
               </div>
             </motion.div>
           )}
-        </AnimatePresence>
-      </div>
-    </div>
-  );
+                </AnimatePresence>
+
+<AnimatePresence>
+  {confirmSub && (
+    <motion.div
+      initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
+      className="fixed inset-0 bg-black/60 z-50 flex items-end justify-center"
+      onClick={() => setConfirmSub(null)}>
+      <motion.div
+        initial={{ y: 60, opacity: 0 }} animate={{ y: 0, opacity: 1 }} exit={{ y: 60, opacity: 0 }}
+        transition={{ type: 'spring', stiffness: 400, damping: 35 }}
+        onClick={e => e.stopPropagation()}
+        className="w-full max-w-[420px] bg-zinc-900 border border-zinc-700 rounded-t-3xl px-4 pt-5 pb-8 shadow-2xl">
+        <div className="flex items-center gap-3 mb-4">
+          <div className="w-9 h-9 rounded-xl bg-red-500/15 border border-red-500/30 flex items-center justify-center shrink-0">
+            <Trash2 className="w-4 h-4 text-red-400" />
+          </div>
+          <div>
+            <p className="text-sm font-semibold text-zinc-100">{t.sub_delete || 'Delete'} «{confirmSub.name}»?</p>
+            <p className="text-xs text-zinc-500 mt-0.5">{t.delete_confirm_hint || 'Вы уверены?'}</p>
+          </div>
+        </div>
+        <button
+          onClick={() => { triggerDelete(confirmSub); setConfirmSub(null); }}
+          className="w-full bg-red-600/90 hover:bg-red-600 text-white text-sm font-semibold py-3 rounded-2xl active:scale-[0.98] transition mb-3">
+          {t.sub_delete || 'Delete'}
+        </button>
+        <button
+          onClick={() => setConfirmSub(null)}
+          className="w-full text-zinc-400 text-sm py-2 active:scale-[0.98] transition">
+          {t.modal_cancel || 'Cancel'}
+        </button>
+      </motion.div>
+    </motion.div>
+  )}
+</AnimatePresence>
+</div>
+</div>
+);
 };
 
 // ─── Анимация строки для онбординга ───────────────────────────────────────────
@@ -1534,6 +1570,15 @@ const SUPPORT_LINKS = [
 ];
 
 const SupportMenu = () => {
+  // логирование клика по донату
+  const logDonateClick = async (platform, action) => {
+    const { data } = await supabase.auth.getUser();
+    await supabase.from('donate_clicks').insert({
+      platform,
+      action,
+      user_id: data?.user?.id ?? null,
+    });
+  };
   const t = useT();
   const [open, setOpen] = useState(false);
   const [copied, setCopied] = useState(false);
@@ -1590,12 +1635,12 @@ const SupportMenu = () => {
                 </div>
                 {link.url ? (
                   <a href={link.url} target="_blank" rel="noopener noreferrer"
-                    onClick={() => setOpen(false)}
+                  onClick={() => { setOpen(false); logDonateClick(link.id, 'open'); }}
                     className={`block w-full text-center text-xs font-semibold py-1.5 rounded-lg ${link.color} bg-black/20 active:scale-95 transition`}>
                     {t.support_open}
                   </a>
                 ) : (
-                  <button onClick={() => copyAddress(link.address)}
+                  <button onClick={() => { copyAddress(link.address); logDonateClick(link.id, 'copy_address'); }}
                     className={`w-full text-xs font-semibold py-1.5 rounded-lg ${link.color} bg-black/20 active:scale-95 transition`}>
                     {copied ? t.support_copied : t.support_copy}
                   </button>
@@ -2133,20 +2178,27 @@ const SubscriptionRow = ({ sub, fmt, fmtOriginal, monthly, onEdit, onDelete }) =
   const x = useMotionValue(0);
   const startRef = useRef(null);
   const isVertical = useRef(false);
+  const axisLocked = useRef(false); // ось зафиксирована — больше не переключаем
 
   const onPointerDown = (e) => {
     startRef.current = { x: e.clientX, y: e.clientY };
     isVertical.current = false;
+    axisLocked.current = false;
   };
 
   const onPointerMove = (e) => {
-    if (!startRef.current) return;
+    if (!startRef.current || axisLocked.current) return;
     const dx = Math.abs(e.clientX - startRef.current.x);
     const dy = Math.abs(e.clientY - startRef.current.y);
-    if (dx < 4 && dy < 4) return;
-    if (!isVertical.current && dy > dx) {
+    // Ждём минимум 20px перед определением оси
+    if (dx < 20 && dy < 20) return;
+    // Угол > ~22° от горизонтали (dy/dx > 0.2) считаем скроллом
+    if (dy > dx * 0.2) {
       isVertical.current = true;
-      x.set(0); // сбрасываем позицию если определили вертикаль
+      axisLocked.current = true;
+      x.set(0);
+    } else {
+      axisLocked.current = true; // горизонталь — фиксируем, не даём перепрыгнуть
     }
   };
 
@@ -2164,18 +2216,19 @@ const SubscriptionRow = ({ sub, fmt, fmtOriginal, monthly, onEdit, onDelete }) =
       </div>
       <motion.div
         data-no-tab-swipe
-        drag="x"
-        dragConstraints={{ left: -80, right: 80 }}
-        dragElastic={0.15}
+        drag={isVertical.current ? false : 'x'}
+        dragConstraints={{ left: -90, right: 90 }}
+        dragElastic={0.08}
         dragSnapToOrigin
         style={{ x }}
         onDragEnd={(_, info) => {
           if (!isVertical.current) {
-            if (info.offset.x <= -60) onDelete();
-            else if (info.offset.x >= 60) onEdit();
+            if (info.offset.x <= -70) onDelete();
+            else if (info.offset.x >= 70) onEdit();
           }
           startRef.current = null;
           isVertical.current = false;
+          axisLocked.current = false;
         }}
         className={`relative flex items-center px-4 py-3 gap-3 bg-[#1C1C1E]`}>
         <LogoIcon sub={sub} size="sm" />

@@ -235,6 +235,10 @@ export const translations = {
     sub_delete:    'Delete',
     undo:          'Undo',
 
+    //Delete confirm
+    delete_confirm_hint: 'Вы уверены?',
+    delete_confirm_hint: "Are you sure?",
+
     // Calendar
     calendar_title: 'Calendar',
     expected:      (month) => `Expected in ${month}`,
