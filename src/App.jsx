@@ -249,7 +249,11 @@ const isDueWithinDays = (sub, days = 7) => {
     if (billingMonth === null || billingMonth !== now.getMonth()) return false;
   }
 
-  return ((billingDay - now.getDate() + 31) % 31) <= days;
+  const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+  const thisMonth = new Date(today.getFullYear(), today.getMonth(), billingDay);
+  const target = thisMonth >= today ? thisMonth : new Date(today.getFullYear(), today.getMonth() + 1, billingDay);
+  const diff = Math.round((target - today) / 86400000);
+  return diff >= 0 && diff <= days;
 };
 
 // price в оригинальной валюте → USD для суммирования
@@ -498,6 +502,7 @@ const App = ({ session, toggleLang, lang }) => {
 
   const switchTab = (tab) => {
     setActiveTab(tab);
+    setSearchQuery('');
     analytics.tabSwitched(tab);
   };
 
@@ -2394,7 +2399,9 @@ const SubModal = ({ initial, currency, onSave, onClose }) => {
   const [month,    setMonth]    = useState(() => { if (!initial?.date) return ''; return String(initial.date).trim().split(' ')[1] || ''; });
   const [suggestions,     setSuggestions]     = useState([]);
   const [showSuggestions, setShowSuggestions] = useState(false);
+  const [dayError, setDayError] = useState(false);
   const justApplied = useRef(false);
+  const priceRef = useRef(null);
 
   // Автосаджест
   useEffect(() => {
@@ -2415,14 +2422,20 @@ const SubModal = ({ initial, currency, onSave, onClose }) => {
     setCategory(service.category);
     setShowSuggestions(false);
     setSuggestions([]);
+    setTimeout(() => priceRef.current?.focus(), 50);
   };
 
-  const canSave = name.trim() && price !== '';
+  const canSave = name.trim() && price !== '' && (period !== 'yearly' || (day && month));
 
   const handleSubmit = () => {
     if (!canSave) return;
+    const dayNum = Number(day);
+    if (day && (dayNum < 1 || dayNum > 31)) {
+      setDayError(true);
+      setTimeout(() => setDayError(false), 600);
+      return;
+    }
     const dateStr = day && month ? `${day} ${month}` : day || '—';
-    // Сохраняем цену в оригинальной валюте — никакой конвертации
     onSave({ name: name.trim(), price: Number(price), currencyCode: modalCurrency, period, category, date: dateStr, logo: initial?.logo || '', status, trial_end: status === 'trial' && trialEnd ? trialEnd : null });
   };
 
@@ -2482,7 +2495,7 @@ const SubModal = ({ initial, currency, onSave, onClose }) => {
           <div className="flex gap-2">
             <div className="relative flex-1">
               <span className="absolute left-4 top-1/2 -translate-y-1/2 text-zinc-400 text-sm pointer-events-none">{curr.symbol}</span>
-              <input type="number" inputMode="decimal" placeholder={t.modal_price_placeholder}
+              <input ref={priceRef} type="number" inputMode="decimal" placeholder={t.modal_price_placeholder}
                 className="w-full bg-black border border-zinc-800 rounded-2xl pl-8 pr-4 py-3 text-sm focus:outline-none focus:border-zinc-500 transition"
                 value={price} onChange={e => setPrice(e.target.value)} />
             </div>
@@ -2531,11 +2544,12 @@ const SubModal = ({ initial, currency, onSave, onClose }) => {
               </p>
             )}
             <div className="flex gap-2">
-              <input type="number" inputMode="numeric"
-                placeholder={period === 'yearly' ? t.modal_day_placeholder : t.modal_day_billing_placeholder}
-                min="1" max="31"
-                className={`${period === 'yearly' ? 'flex-1' : 'w-full'} bg-black border border-zinc-800 rounded-2xl px-4 py-3 text-sm focus:outline-none focus:border-zinc-500 transition`}
-                value={day} onChange={e => { const v = e.target.value; if (v === '' || (Number(v) >= 1 && Number(v) <= 31)) setDay(v); }} />
+            <input type="number" inputMode="numeric"
+            placeholder={period === 'yearly' ? t.modal_day_placeholder : t.modal_day_billing_placeholder}
+              min="1" max="31"
+              className={`${period === 'yearly' ? 'flex-1' : 'w-full'} bg-black border rounded-2xl px-4 py-3 text-sm focus:outline-none transition
+              ${dayError ? 'border-red-500 shake' : 'border-zinc-800 focus:border-zinc-500'}`}
+              value={day} onChange={e => { const v = e.target.value; if (v === '' || (Number(v) >= 1 && Number(v) <= 31)) setDay(v); }} />
               {period === 'yearly' && (
                 <div className="flex-1"><MonthPicker value={month} onChange={setMonth} /></div>
               )}
