@@ -12,7 +12,7 @@
 ![Supabase](https://img.shields.io/badge/Supabase-green)
 ![Vercel](https://img.shields.io/badge/Deployed-Vercel-black)
 
-**[→ Open the app](https://checkursubs.vercel.app)**
+**[→ Open the app](https://checkursubs.casablanque.com/)**
 
 ---
 
