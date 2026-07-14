@@ -1,8 +1,8 @@
-name: Supabase Daily Backup
+name: Supabase Weekly Backup
 
 on:
   schedule:
-    - cron: '0 3 * * *'  # 03:00 UTC — подальше от пиковой нагрузки
+    - cron: '0 3 * * 1'  # 03:00 UTC — подальше от пиковой нагрузки
   workflow_dispatch:       # ручной запуск из GitHub UI
 
 jobs:
