@@ -22,4 +22,10 @@ const injectSwVersion = () => ({
 
 export default defineConfig({
   plugins: [react(), injectSwVersion()],
+  test: {
+    // Пока покрываем только чистые функции из src/lib — jsdom не нужен.
+    // Когда дойдём до тестов компонентов, поменять на 'jsdom'.
+    environment: 'node',
+    include: ['src/**/*.test.js'],
+  },
 })
