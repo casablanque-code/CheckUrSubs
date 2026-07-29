@@ -26,4 +26,12 @@ export default defineConfig([
       'no-unused-vars': ['error', { varsIgnorePattern: '^[A-Z_]' }],
     },
   },
+  {
+    // Тесты выполняются в Node (Vitest), не в браузере — нужны node-globals
+    // вроде global/Buffer в дополнение к browser-глобалам.
+    files: ['**/*.test.js'],
+    languageOptions: {
+      globals: { ...globals.browser, ...globals.node },
+    },
+  },
 ])
