@@ -11,10 +11,14 @@ import { supabase } from './lib/supabase';
 import { CURRENCIES, getCurrency, DEFAULT_RATES, fetchRates, loadRates, toUSD, monthlyUSD } from './lib/currency';
 import { MONTHS_SHORT, MONTHS_SHORT_RU, TABS, fmtDateFromISO, extractBillingDay, extractBillingMonth, isDueWithinDays } from './lib/billing';
 import { CATEGORIES, getCat } from './lib/categories';
-import { SERVICE_CATALOG, getCatalogEntry, getLogoUrl, getLucideIcon } from './lib/serviceCatalog';
+import { SERVICE_CATALOG, getCatalogEntry } from './lib/serviceCatalog';
 import { urlBase64ToUint8Array } from './lib/push';
 import { useDragScroll } from './hooks/useDragScroll';
 import { useTabSwipe } from './hooks/useTabSwipe';
+import LogoLoader from './components/LogoLoader';
+import SectionTitle from './components/SectionTitle';
+import CategoryBadge from './components/CategoryBadge';
+import LogoIcon from './components/LogoIcon';
 import { analytics } from './lib/analytics';
 import { translations, LangContext, useLang, useT } from './lib/i18n';
 import Auth from './Auth';
@@ -26,31 +30,6 @@ import Auth from './Auth';
 // APP
 // ═══════════════════════════════════════════════════════════════════════════════
 // ─── Animated Logo Loader ────────────────────────────────────────────────────
-const LogoLoader = () => (
-  <div className="min-h-screen bg-black flex items-center justify-center">
-    <svg width="80" height="80" viewBox="0 0 80 80" fill="none" xmlns="http://www.w3.org/2000/svg">
-      <style>{`
-        @keyframes c3{from{opacity:0;transform:translateY(8px)}to{opacity:1;transform:translateY(0)}}
-        @keyframes c2{from{opacity:0;transform:translateY(8px)}to{opacity:1;transform:translateY(0)}}
-        @keyframes c1{from{opacity:0;transform:translateY(8px)}to{opacity:1;transform:translateY(0)}}
-        @keyframes ck{from{stroke-dashoffset:36;opacity:0}to{stroke-dashoffset:0;opacity:1}}
-        .lc3{animation:c3 .3s ease-out .05s both}
-        .lc2{animation:c2 .3s ease-out .25s both}
-        .lc1{animation:c1 .3s ease-out .45s both}
-        .lck{animation:ck .5s ease-out .9s both;stroke-dasharray:36;stroke-dashoffset:36}
-      `}</style>
-      <g className="lc3"><rect x="14" y="38" width="52" height="28" rx="7" fill="#1a1a1a" stroke="#252525" strokeWidth="1.5"/></g>
-      <g className="lc2"><rect x="14" y="30" width="52" height="28" rx="7" fill="#141414" stroke="#333" strokeWidth="1.5"/></g>
-      <g className="lc1">
-        <rect x="14" y="22" width="52" height="28" rx="7" fill="#0e0e0e" stroke="#484848" strokeWidth="1.5"/>
-        <rect x="22" y="32" width="18" height="3" rx="1.5" fill="#2a2a2a"/>
-        <rect x="22" y="38" width="12" height="3" rx="1.5" fill="#222"/>
-      </g>
-      <path className="lck" d="M44 26 L52 37 L66 20" stroke="white" strokeWidth="3.5" strokeLinecap="round" strokeLinejoin="round" fill="none"/>
-    </svg>
-  </div>
-);
-
 const App = ({ session, toggleLang, lang }) => {
   const userId = session.user.id;
   const t = useT();
@@ -1753,45 +1732,6 @@ const SoonSection = ({ soonSubs, fmtOriginal }) => {
 };
 
 // ─── Компоненты ────────────────────────────────────────────────────────────────
-const SectionTitle = ({ icon: Icon, label }) => (
-  <div className="flex items-center gap-2 px-1">
-    <Icon className="w-4 h-4 text-zinc-400" strokeWidth={2} />
-    <h3 className="font-semibold text-base tracking-tight">{label}</h3>
-  </div>
-);
-
-const LogoIcon = ({ sub, size = 'md' }) => {
-  const [err, setErr] = useState(false);
-  const wrap = size === 'sm' ? 'w-8 h-8' : 'w-10 h-10';
-  const img  = size === 'sm' ? 'w-5 h-5' : 'w-6 h-6';
-  const LucideIcon = getLucideIcon(sub);
-  const url  = !err && !LucideIcon ? getLogoUrl(sub) : null;
-  return (
-    <div className={`${wrap} bg-zinc-800 rounded-2xl flex items-center justify-center border border-zinc-700 overflow-hidden shrink-0`}>
-      {LucideIcon
-        ? <LucideIcon className={`${img} text-zinc-300`} />
-        : url
-          ? <img src={url} className={`${img} object-contain`} alt="" onError={() => setErr(true)} />
-          : <CreditCard className="w-4 h-4 text-zinc-300" />}
-    </div>
-  );
-};
-
-const CategoryBadge = ({ cat, tiny = false }) => {
-  const Icon = cat.icon;
-  if (tiny) return (
-    <div className={`flex items-center gap-1 px-1.5 py-0.5 rounded-lg ${cat.bg} border ${cat.border}`}>
-      <Icon className={`w-2.5 h-2.5 ${cat.color}`} />
-    </div>
-  );
-  return (
-    <div className={`flex items-center gap-1.5 px-2.5 py-1 rounded-xl ${cat.bg} border ${cat.border}`}>
-      <Icon className={`w-3 h-3 ${cat.color}`} />
-      <span className={`text-xs font-medium ${cat.color}`}>{cat.label}</span>
-    </div>
-  );
-};
-
 const SoonCard = ({ sub, fmtOriginal }) => {
   const t    = useT();
   const lang = useLang();
