@@ -13,12 +13,15 @@ import { MONTHS_SHORT, MONTHS_SHORT_RU, TABS, fmtDateFromISO, extractBillingDay,
 import { CATEGORIES, getCat } from './lib/categories';
 import { SERVICE_CATALOG, getCatalogEntry } from './lib/serviceCatalog';
 import { urlBase64ToUint8Array } from './lib/push';
-import { useDragScroll } from './hooks/useDragScroll';
 import { useTabSwipe } from './hooks/useTabSwipe';
 import LogoLoader from './components/LogoLoader';
 import SectionTitle from './components/SectionTitle';
 import CategoryBadge from './components/CategoryBadge';
 import LogoIcon from './components/LogoIcon';
+import SoonSection from './components/SoonSection';
+import CurrencySelector from './components/CurrencySelector';
+import ModalCurrencySelector from './components/ModalCurrencySelector';
+import MonthPicker from './components/MonthPicker';
 import { analytics } from './lib/analytics';
 import { translations, LangContext, useLang, useT } from './lib/i18n';
 import Auth from './Auth';
@@ -1715,71 +1718,6 @@ const CalendarSection = ({ subscriptions, fmt, fmtReal, monthly, month, year, on
 };
 
 // ─── Soon ──────────────────────────────────────────────────────────────────────
-const SoonSection = ({ soonSubs, fmtOriginal }) => {
-  const t = useT();
-  const ref = useDragScroll();
-  return (
-    <section className="space-y-3">
-      <SectionTitle icon={CalendarDays} label={t.soon} />
-      {soonSubs.length === 0
-        ? <p className="text-sm text-zinc-600 px-1">{t.soon_empty}</p>
-        : <div ref={ref} data-no-tab-swipe className="flex gap-3 overflow-x-auto no-scrollbar px-1 pb-1">
-            {soonSubs.map(sub => <SoonCard key={sub.id} sub={sub} fmtOriginal={fmtOriginal} />)}
-          </div>
-      }
-    </section>
-  );
-};
-
-// ─── Компоненты ────────────────────────────────────────────────────────────────
-const SoonCard = ({ sub, fmtOriginal }) => {
-  const t    = useT();
-  const lang = useLang();
-  const cat  = sub.category ? getCat(sub.category) : null;
-
-  // Считаем сколько дней до списания
-  const daysLeft = (() => {
-    const today = new Date();
-    today.setHours(0, 0, 0, 0);
-    let target;
-    if (sub.status === 'trial' && sub.trial_end) {
-      target = new Date(sub.trial_end);
-      target.setHours(0, 0, 0, 0);
-    } else {
-      const day = sub.billingDay ?? extractBillingDay(sub.date);
-      if (!day) return null;
-      target = new Date(today.getFullYear(), today.getMonth(), day);
-      if (target < today) target.setMonth(target.getMonth() + 1);
-    }
-    return Math.round((target - today) / 86400000);
-  })();
-
-  const daysLabel = (() => {
-    if (daysLeft === null) return null;
-    if (daysLeft === 0) return lang === 'ru' ? 'сегодня' : 'today';
-    if (daysLeft === 1) return lang === 'ru' ? 'завтра'  : 'tomorrow';
-    return lang === 'ru' ? `через ${daysLeft} дн.` : `in ${daysLeft}d`;
-  })();
-
-  return (
-    <div className="w-[168px] bg-[#1C1C1E] rounded-[28px] p-5 border border-zinc-800 active:scale-[0.97] transition shrink-0 flex flex-col">
-      <div className="flex justify-between items-start mb-4">
-        <LogoIcon sub={sub} size="md" />
-        <span className={`text-[10px] font-bold px-2 py-1 rounded-xl border shrink-0 ml-2 ${
-          daysLeft === 0 ? 'text-red-400 bg-red-500/15 border-red-500/30' :
-          daysLeft === 1 ? 'text-amber-400 bg-amber-500/15 border-amber-500/30' :
-          'text-white bg-zinc-800 border-zinc-700'
-        }`}>{daysLabel ?? sub.date}</span>
-      </div>
-      <p className="font-semibold text-sm leading-snug mb-2 flex-1" style={{ display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical', overflow: 'hidden' }}>{sub.name}</p>
-      <div className="flex items-center justify-between gap-1">
-        <p className="text-zinc-400 text-xs truncate">{fmtOriginal(sub)}</p>
-        {cat && <CategoryBadge cat={cat} tiny />}
-      </div>
-    </div>
-  );
-};
-
 const SubscriptionRow = ({ sub, fmt, fmtOriginal, monthly, onEdit, onDelete }) => {
   const t    = useT();
   const lang = useLang();
@@ -1860,33 +1798,6 @@ const SubscriptionRow = ({ sub, fmt, fmtOriginal, monthly, onEdit, onDelete }) =
 };
 
 // ─── Валюта ────────────────────────────────────────────────────────────────────
-const CurrencySelector = ({ value, onChange }) => {
-  const [open, setOpen] = useState(false);
-  const curr = getCurrency(value);
-  return (
-    <div className="relative inline-block">
-      <button onClick={() => setOpen(o => !o)}
-        className="inline-flex items-center gap-1.5 bg-zinc-800/70 hover:bg-zinc-700/70 border border-zinc-700 text-zinc-300 text-xs font-semibold px-3 py-1.5 rounded-full transition active:scale-95">
-        {curr.label} <ChevronDown className="w-3 h-3" />
-      </button>
-      <AnimatePresence>
-        {open && (
-          <motion.div initial={{ opacity: 0, y: -6, scale: 0.96 }} animate={{ opacity: 1, y: 0, scale: 1 }} exit={{ opacity: 0, y: -6, scale: 0.96 }} transition={{ duration: 0.12 }}
-            className="absolute top-9 left-1/2 -translate-x-1/2 bg-zinc-900 border border-zinc-700 rounded-2xl shadow-2xl overflow-hidden z-50 min-w-[130px]">
-            {CURRENCIES.map(c => (
-              <button key={c.code} onClick={() => { onChange(c.code); setOpen(false); }}
-                className="w-full flex items-center justify-between px-4 py-2.5 text-sm hover:bg-zinc-800 transition">
-                <span className={value === c.code ? 'text-white font-semibold' : 'text-zinc-400'}>{c.label}</span>
-                {value === c.code && <Check className="w-3.5 h-3.5 text-white" />}
-              </button>
-            ))}
-          </motion.div>
-        )}
-      </AnimatePresence>
-    </div>
-  );
-};
-
 // ─── Модалка ───────────────────────────────────────────────────────────────────
 // ─── DatePicker ────────────────────────────────────────────────────────────────
 const DatePicker = ({ value, onChange, label }) => {
@@ -2213,59 +2124,6 @@ const SubModal = ({ initial, currency, onSave, onClose }) => {
         <button type="button" onClick={onClose} className="mt-3 mb-2 w-full text-zinc-400 text-sm py-2">{t.modal_cancel}</button>
       </motion.div>
     </>
-  );
-};
-
-const ModalCurrencySelector = ({ value, onChange }) => {
-  const [open, setOpen] = useState(false);
-  const curr = getCurrency(value);
-  return (
-    <div className="relative">
-      <button type="button" onClick={() => setOpen(o => !o)}
-        className="h-full bg-black border border-zinc-800 rounded-2xl px-3 py-3 text-sm flex items-center gap-1 focus:outline-none focus:border-zinc-500 transition text-zinc-300 font-semibold whitespace-nowrap">
-        {curr.code} <ChevronDown className="w-3.5 h-3.5 text-zinc-500" />
-      </button>
-      <AnimatePresence>
-        {open && (
-          <motion.div initial={{ opacity: 0, y: -6 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -6 }} transition={{ duration: 0.12 }}
-            className="absolute bottom-14 right-0 bg-zinc-900 border border-zinc-700 rounded-2xl shadow-2xl overflow-hidden z-50 min-w-[120px]">
-            {CURRENCIES.map(c => (
-              <button key={c.code} type="button" onClick={() => { onChange(c.code); setOpen(false); }}
-                className="w-full flex items-center justify-between px-4 py-2.5 text-sm hover:bg-zinc-800 transition">
-                <span className={value === c.code ? 'text-white font-semibold' : 'text-zinc-400'}>{c.label}</span>
-                {value === c.code && <Check className="w-3 h-3 text-white" />}
-              </button>
-            ))}
-          </motion.div>
-        )}
-      </AnimatePresence>
-    </div>
-  );
-};
-
-const MonthPicker = ({ value, onChange }) => {
-  const [open, setOpen] = useState(false);
-  return (
-    <div className="relative">
-      <button type="button" onClick={() => setOpen(o => !o)}
-        className="w-full bg-black border border-zinc-800 rounded-2xl px-4 py-3 text-sm text-left flex justify-between items-center focus:outline-none focus:border-zinc-500 transition">
-        <span className={value ? 'text-white' : 'text-zinc-600'}>{value || 'Месяц'}</span>
-        <ChevronDown className="w-4 h-4 text-zinc-500 shrink-0" />
-      </button>
-      <AnimatePresence>
-        {open && (
-          <motion.div initial={{ opacity: 0, y: -6 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -6 }} transition={{ duration: 0.12 }}
-            className="absolute bottom-14 left-0 right-0 bg-zinc-900 border border-zinc-700 rounded-2xl shadow-2xl overflow-hidden z-50 grid grid-cols-3">
-            {MONTHS_SHORT.map(m => (
-              <button key={m} type="button" onClick={() => { onChange(m); setOpen(false); }}
-                className={`py-2.5 text-sm transition hover:bg-zinc-800 ${value === m ? 'font-semibold text-white' : 'text-zinc-400'}`}>
-                {m}
-              </button>
-            ))}
-          </motion.div>
-        )}
-      </AnimatePresence>
-    </div>
   );
 };
 
