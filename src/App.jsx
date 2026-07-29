@@ -13,96 +13,14 @@ import { MONTHS_SHORT, MONTHS_SHORT_RU, TABS, fmtDateFromISO, extractBillingDay,
 import { CATEGORIES, getCat } from './lib/categories';
 import { SERVICE_CATALOG, getCatalogEntry, getLogoUrl, getLucideIcon } from './lib/serviceCatalog';
 import { urlBase64ToUint8Array } from './lib/push';
+import { useDragScroll } from './hooks/useDragScroll';
+import { useTabSwipe } from './hooks/useTabSwipe';
 import { analytics } from './lib/analytics';
 import { translations, LangContext, useLang, useT } from './lib/i18n';
 import Auth from './Auth';
 
 
 // ─── Константы ────────────────────────────────────────────────────────────────
-
-
-// ─── Хук drag-scroll (горизонталь) ────────────────────────────────────────────
-// ─── Хук drag-scroll (горизонталь, без конфликта с вертикалью) ────────────────
-const useDragScroll = () => {
-  const ref = useRef(null);
-  useEffect(() => {
-    const el = ref.current;
-    if (!el) return;
-    // Mouse
-    let down = false, startX = 0, sl = 0;
-    const onDown = (e) => { if (e.pointerType !== 'mouse') return; down = true; startX = e.clientX; sl = el.scrollLeft; el.setPointerCapture?.(e.pointerId); el.style.cursor = 'grabbing'; };
-    const onMove = (e) => { if (!down) return; el.scrollLeft = sl - (e.clientX - startX); };
-    const onUp   = (e) => { if (!down) return; down = false; el.releasePointerCapture?.(e.pointerId); el.style.cursor = ''; };
-    // Touch — определяем ось по первым пикселям, не блокируем вертикаль
-    let tx = 0, ty = 0, tsl = 0, axis = null;
-    const onTouchStart = (e) => { tx = e.touches[0].clientX; ty = e.touches[0].clientY; tsl = el.scrollLeft; axis = null; };
-    const onTouchMove  = (e) => {
-      const dx = e.touches[0].clientX - tx;
-      const dy = e.touches[0].clientY - ty;
-      if (!axis) {
-        if (Math.abs(dx) < 4 && Math.abs(dy) < 4) return;
-        axis = Math.abs(dx) > Math.abs(dy) ? 'x' : 'y';
-      }
-      if (axis === 'x') { e.preventDefault(); e.stopPropagation(); el.scrollLeft = tsl - dx; }
-    };
-    el.addEventListener('pointerdown',  onDown);
-    el.addEventListener('pointermove',  onMove);
-    el.addEventListener('pointerup',    onUp);
-    el.addEventListener('pointerleave', onUp);
-    el.addEventListener('touchstart',   onTouchStart, { passive: true });
-    el.addEventListener('touchmove',    onTouchMove,  { passive: false });
-    return () => {
-      el.removeEventListener('pointerdown',  onDown);
-      el.removeEventListener('pointermove',  onMove);
-      el.removeEventListener('pointerup',    onUp);
-      el.removeEventListener('pointerleave', onUp);
-      el.removeEventListener('touchstart',   onTouchStart);
-      el.removeEventListener('touchmove',    onTouchMove);
-    };
-  }, []);
-  return ref;
-};
-
-// ─── Хук свайп между вкладками ────────────────────────────────────────────────
-const useTabSwipe = (activeTab, setActiveTab, enabled = true) => {
-  const ref    = useRef(null);
-  const state  = useRef({ x: 0, y: 0, active: false });
-
-  useEffect(() => {
-    const el = ref.current;
-    if (!el || !enabled) return;
-
-    const onStart = (e) => {
-      const t = e.touches?.[0];
-      if (!t) return;
-      // Игнорируем если начали на горизонтальном скроллере или на строке подписки
-      const target = e.target.closest('[data-no-tab-swipe]');
-      if (target) return;
-      state.current = { x: t.clientX, y: t.clientY, active: true };
-    };
-
-    const onEnd = (e) => {
-      if (!state.current.active) return;
-      state.current.active = false;
-      const t  = e.changedTouches?.[0];
-      if (!t) return;
-      const dx = t.clientX - state.current.x;
-      const dy = t.clientY - state.current.y;
-      // Высокий порог (120px) + строго горизонтально (угол < 30°)
-      if (Math.abs(dx) < 120) return;
-      if (Math.abs(dy) > Math.abs(dx) * 0.58) return;
-      const idx = TABS.indexOf(activeTab);
-      if (dx < 0 && idx < TABS.length - 1) setActiveTab(TABS[idx + 1]);
-      if (dx > 0 && idx > 0)               setActiveTab(TABS[idx - 1]);
-    };
-
-    el.addEventListener('touchstart', onStart, { passive: true });
-    el.addEventListener('touchend',   onEnd,   { passive: true });
-    return () => { el.removeEventListener('touchstart', onStart); el.removeEventListener('touchend', onEnd); };
-  }, [activeTab, setActiveTab, enabled]);
-
-  return ref;
-};
 
 // ═══════════════════════════════════════════════════════════════════════════════
 // APP
