@@ -37,6 +37,23 @@ export default defineConfig([
     },
   },
   {
+    // Service Worker выполняется в своём глобальном контексте (self,
+    // clients, caches...), а не в обычном window — отдельные globals.
+    files: ['public/sw.js'],
+    languageOptions: {
+      globals: globals.serviceworker,
+    },
+  },
+  {
+    // Конфиг Vite выполняется в Node (Vite сам транспилирует его перед
+    // запуском), а не в браузере — __dirname и т.п. реально существуют
+    // в рантайме, просто eslint по умолчанию видит только browser-globals.
+    files: ['vite.config.js'],
+    languageOptions: {
+      globals: globals.node,
+    },
+  },
+  {
     // Тесты выполняются в Node (Vitest), не в браузере — нужны node-globals
     // вроде global/Buffer в дополнение к browser-глобалам.
     files: ['**/*.test.js'],

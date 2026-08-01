@@ -28,7 +28,11 @@ export const loadRates = () => {
     const raw = localStorage.getItem('fxRates');
     const at  = Number(localStorage.getItem('fxRatesAt') || 0);
     if (raw && Date.now() - at < 4 * 60 * 60 * 1000) return JSON.parse(raw);
-  } catch {}
+  } catch {
+    // Битый JSON в localStorage / недоступен localStorage (приватный режим
+    // и т.п.) — тихо считаем, что кэша нет, вызывающий код уйдёт на
+    // DEFAULT_RATES или явный fetchRates().
+  }
   return null;
 };
 

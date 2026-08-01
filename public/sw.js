@@ -31,6 +31,8 @@ self.addEventListener('activate', (event) => {
 // ─── Push уведомления ─────────────────────────────────────────────────────────
 self.addEventListener('push', (event) => {
   let data = { title: 'CheckUrSubs', body: 'Скоро списание подписки' };
+  // Пуш без валидного JSON payload (или без payload вовсе) — используем
+  // дефолтный title/body, объявленный выше.
   try { data = event.data.json(); } catch {}
   event.waitUntil(
     self.registration.showNotification(data.title, {

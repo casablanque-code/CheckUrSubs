@@ -22,6 +22,12 @@ import SoonSection from './components/SoonSection';
 import CurrencySelector from './components/CurrencySelector';
 import ModalCurrencySelector from './components/ModalCurrencySelector';
 import MonthPicker from './components/MonthPicker';
+import NavItem from './components/NavItem';
+import SwipeDemo from './components/SwipeDemo';
+import SubscriptionRow from './components/SubscriptionRow';
+import DatePicker from './components/DatePicker';
+import DeleteAccountModal from './components/DeleteAccountModal';
+import AvatarMenu from './components/AvatarMenu';
 import { analytics } from './lib/analytics';
 import { translations, LangContext, useLang, useT } from './lib/i18n';
 import Auth from './Auth';
@@ -598,7 +604,7 @@ const App = ({ session, toggleLang, lang }) => {
                       </div>
                     )}
                     {sortedSubs.map(sub => (
-                      <SubscriptionRow key={sub.id} sub={sub} fmt={fmt} fmtOriginal={fmtOriginal} monthly={monthly}
+                      <SubscriptionRow key={sub.id} sub={sub} fmtOriginal={fmtOriginal}
                         onEdit={() => openEdit(sub)} onDelete={() => setConfirmSub(sub)} />
                     ))}
                     {sortedSubs.length === 0 && searchQuery && (
@@ -947,48 +953,6 @@ const App = ({ session, toggleLang, lang }) => {
 };
 
 // ─── Анимация строки для онбординга ───────────────────────────────────────────
-const SwipeDemo = () => {
-  const [phase, setPhase] = useState(0);
-  useEffect(() => {
-    const delays = [1200, 900, 1200, 900];
-    const t = setTimeout(() => setPhase(p => (p + 1) % 4), delays[phase]);
-    return () => clearTimeout(t);
-  }, [phase]);
-
-  const x          = phase === 1 ? -72 : phase === 3 ? 72 : 0;
-  const showDelete = phase === 1;
-  const showEdit   = phase === 3;
-
-  return (
-    <div className="w-full rounded-2xl overflow-hidden border border-zinc-800 relative">
-      <div className="absolute inset-0 flex">
-        <div className={`flex-1 flex items-center pl-5 gap-2 text-xs font-semibold transition-opacity duration-200 ${showEdit ? 'opacity-100 bg-emerald-600/80' : 'opacity-0'}`}>
-          <Pencil className="w-3.5 h-3.5" /> Редактировать
-        </div>
-        <div className={`flex-1 flex items-center justify-end pr-5 gap-2 text-xs font-semibold transition-opacity duration-200 ${showDelete ? 'opacity-100 bg-red-600/80' : 'opacity-0'}`}>
-          Удалить <Trash2 className="w-3.5 h-3.5" />
-        </div>
-      </div>
-      <motion.div
-        animate={{ x }}
-        transition={{ type: 'spring', stiffness: 300, damping: 28 }}
-        className="relative flex items-center px-4 py-3.5 gap-3 bg-[#1C1C1E]"
-      >
-        <div className="w-8 h-8 bg-zinc-800 rounded-2xl border border-zinc-700 flex items-center justify-center shrink-0 overflow-hidden">
-          <img src="https://www.google.com/s2/favicons?sz=32&domain=spotify.com" className="w-5 h-5 object-contain" alt="" />
-        </div>
-        <div className="min-w-0 flex-1">
-          <p className="text-sm font-medium">Spotify</p>
-          <p className="text-xs text-zinc-500">$12 / мес · 5 Mar</p>
-        </div>
-        <div className="flex items-center gap-1 px-1.5 py-0.5 rounded-lg bg-pink-500/15 border border-pink-500/30">
-          <Music className="w-2.5 h-2.5 text-pink-400" />
-        </div>
-      </motion.div>
-    </div>
-  );
-};
-
 // ─── Онбординг ─────────────────────────────────────────────────────────────────
 const getOnboardingSteps = (t) => [
   { icon: Sparkles,    iconColor: 'text-white',      iconBg: 'bg-zinc-800',       ...t.onb_slides[0] },
@@ -1464,137 +1428,6 @@ const ImportExportMenu = ({ subscriptions, onImport }) => {
 };
 
 // ─── Модалка подтверждения удаления аккаунта ──────────────────────────────────
-const DeleteAccountModal = ({ onConfirm, onCancel }) => {
-  const t = useT();
-  const [inputValue, setInputValue] = useState('');
-  const [loading, setLoading] = useState(false);
-  const confirmWord = t.delete_confirm_word || 'DELETE';
-  const isReady = inputValue.trim().toUpperCase() === confirmWord.toUpperCase();
-
-  const handleConfirm = async () => {
-    if (!isReady) return;
-    setLoading(true);
-    await onConfirm();
-  };
-
-  return (
-    <>
-      <motion.div
-        initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
-        className="fixed inset-0 bg-black/80 backdrop-blur-sm z-[60]"
-        onClick={onCancel}
-      />
-      <motion.div
-        initial={{ opacity: 0, scale: 0.92, y: 24 }}
-        animate={{ opacity: 1, scale: 1, y: 0 }}
-        exit={{ opacity: 0, scale: 0.92, y: 24 }}
-        transition={{ type: 'spring', stiffness: 380, damping: 32 }}
-        className="fixed left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 z-[70] w-[calc(100vw-32px)] max-w-[380px] bg-zinc-950 border border-zinc-800 rounded-3xl p-6 shadow-2xl"
-        onClick={e => e.stopPropagation()}
-      >
-        <div className="w-12 h-12 rounded-2xl bg-red-500/15 border border-red-500/30 flex items-center justify-center mx-auto mb-4">
-          <Trash2 className="w-5 h-5 text-red-400" />
-        </div>
-        <h2 className="text-lg font-semibold text-center mb-2">
-          {t.delete_account_title || 'Delete account'}
-        </h2>
-        <p className="text-sm text-zinc-400 text-center leading-relaxed mb-5">
-          {t.delete_account_desc || 'All your subscriptions and data will be permanently erased. This action cannot be undone.'}
-        </p>
-        <p className="text-xs text-zinc-500 text-center mb-2">
-          {t.delete_type_to_confirm
-            ? t.delete_type_to_confirm.replace('{word}', confirmWord)
-            : `Type ${confirmWord} to confirm`}
-        </p>
-        <input
-          type="text"
-          value={inputValue}
-          onChange={e => setInputValue(e.target.value)}
-          placeholder={confirmWord}
-          autoCapitalize="none"
-          className="w-full bg-black border border-zinc-800 focus:border-red-500/60 rounded-2xl px-4 py-3 text-sm text-center font-semibold tracking-widest text-white placeholder-zinc-700 outline-none transition mb-4"
-        />
-        <button
-          onClick={handleConfirm}
-          disabled={!isReady || loading}
-          className={`w-full py-3 rounded-2xl text-sm font-semibold transition active:scale-95 mb-2 ${isReady && !loading ? 'bg-red-600 hover:bg-red-500 text-white' : 'bg-zinc-800 text-zinc-600 cursor-not-allowed'}`}
-        >
-          {loading ? (t.delete_account_loading || 'Deleting...') : (t.delete_account_confirm || 'Delete everything')}
-        </button>
-        <button onClick={onCancel} disabled={loading}
-          className="w-full py-2.5 rounded-2xl text-sm text-zinc-400 hover:text-zinc-200 transition">
-          {t.modal_cancel || 'Cancel'}
-        </button>
-      </motion.div>
-    </>
-  );
-};
-
-const AvatarMenu = ({ session, onLogout, onDeleteAccount }) => {
-  const t = useT();
-  const [open, setOpen] = useState(false);
-  const [showDeleteModal, setShowDeleteModal] = useState(false);
-  const ref = useRef(null);
-
-  useEffect(() => {
-    if (!open) return;
-    const handler = (e) => { if (ref.current && !ref.current.contains(e.target)) setOpen(false); };
-    document.addEventListener('mousedown', handler);
-    document.addEventListener('touchstart', handler);
-    return () => { document.removeEventListener('mousedown', handler); document.removeEventListener('touchstart', handler); };
-  }, [open]);
-
-  const user = session?.user;
-  const avatarUrl = user?.user_metadata?.avatar_url;
-  const email = user?.email || '';
-  const initials = email ? email[0].toUpperCase() : '?';
-
-  return (
-    <>
-      <div ref={ref} className="relative">
-        <button onClick={() => setOpen(v => !v)}
-          className="w-10 h-10 rounded-full overflow-hidden border-2 border-zinc-700 active:scale-95 transition shrink-0">
-          {avatarUrl
-            ? <img src={avatarUrl} className="w-full h-full object-cover" alt="" />
-            : <div className="w-full h-full bg-zinc-800 flex items-center justify-center text-sm font-semibold text-zinc-300">{initials}</div>
-          }
-        </button>
-        <AnimatePresence>
-          {open && (
-            <motion.div initial={{ opacity: 0, scale: 0.92, y: -6 }} animate={{ opacity: 1, scale: 1, y: 0 }}
-              exit={{ opacity: 0, scale: 0.92, y: -6 }} transition={{ duration: 0.15 }}
-              className="absolute right-0 top-12 bg-zinc-900 border border-zinc-700 rounded-2xl shadow-2xl z-50 min-w-[200px] overflow-hidden">
-              <div className="px-4 py-3 border-b border-zinc-800">
-                <p className="text-xs text-zinc-400 truncate">{email}</p>
-              </div>
-              <button onClick={() => { setOpen(false); onLogout(); }}
-                className="w-full flex items-center gap-3 px-4 py-3 text-sm text-red-400 hover:bg-zinc-800 transition active:bg-zinc-700">
-                <LogOut className="w-4 h-4" />
-                {t.logout}
-              </button>
-              <div className="h-px bg-zinc-800/60 mx-3" />
-              <button onClick={() => { setOpen(false); setShowDeleteModal(true); }}
-                className="w-full flex items-center gap-3 px-4 py-3 text-sm text-zinc-500 hover:bg-zinc-800 hover:text-red-400 transition active:bg-zinc-700">
-                <Trash2 className="w-4 h-4" />
-                {t.delete_account || 'Delete account'}
-              </button>
-            </motion.div>
-          )}
-        </AnimatePresence>
-      </div>
-
-      <AnimatePresence>
-        {showDeleteModal && (
-          <DeleteAccountModal
-            onConfirm={async () => { await onDeleteAccount(); setShowDeleteModal(false); }}
-            onCancel={() => setShowDeleteModal(false)}
-          />
-        )}
-      </AnimatePresence>
-    </>
-  );
-};
-
 // ─── Календарь ─────────────────────────────────────────────────────────────────
 const CalendarSection = ({ subscriptions, fmt, fmtReal, monthly, month, year, onPrev, onNext, calTotal, calYearly, isPast, calMonth }) => {
   const t = useT();
@@ -1718,185 +1551,9 @@ const CalendarSection = ({ subscriptions, fmt, fmtReal, monthly, month, year, on
 };
 
 // ─── Soon ──────────────────────────────────────────────────────────────────────
-const SubscriptionRow = ({ sub, fmt, fmtOriginal, monthly, onEdit, onDelete }) => {
-  const t    = useT();
-  const lang = useLang();
-  const cat = sub.category ? getCat(sub.category) : null;
-  const x = useMotionValue(0);
-  const startRef = useRef(null);
-  const isVertical = useRef(false);
-  const axisLocked = useRef(false); // ось зафиксирована — больше не переключаем
-
-  const onPointerDown = (e) => {
-    startRef.current = { x: e.clientX, y: e.clientY };
-    isVertical.current = false;
-    axisLocked.current = false;
-  };
-
-  const onPointerMove = (e) => {
-    if (!startRef.current || axisLocked.current) return;
-    const dx = Math.abs(e.clientX - startRef.current.x);
-    const dy = Math.abs(e.clientY - startRef.current.y);
-    // Ждём минимум 20px перед определением оси
-    if (dx < 20 && dy < 20) return;
-    // Угол > ~22° от горизонтали (dy/dx > 0.2) считаем скроллом
-    if (dy > dx * 0.2) {
-      isVertical.current = true;
-      axisLocked.current = true;
-      x.set(0);
-    } else {
-      axisLocked.current = true; // горизонталь — фиксируем, не даём перепрыгнуть
-    }
-  };
-
-  return (
-    <div className="relative overflow-hidden"
-      onPointerDown={onPointerDown}
-      onPointerMove={onPointerMove}>
-      <div className="absolute inset-0 flex">
-        <div className="flex-1 bg-emerald-600/90 flex items-center pl-6 text-xs font-semibold gap-2">
-          <Pencil className="w-3.5 h-3.5" /> {t.modal_edit}
-        </div>
-        <div className="flex-1 bg-red-600/90 flex items-center justify-end pr-6 text-xs font-semibold gap-2">
-          {t.sub_delete} <Trash2 className="w-3.5 h-3.5" />
-        </div>
-      </div>
-      <motion.div
-        data-no-tab-swipe
-        drag={isVertical.current ? false : 'x'}
-        dragConstraints={{ left: -90, right: 90 }}
-        dragElastic={0.08}
-        dragSnapToOrigin
-        style={{ x }}
-        onDragEnd={(_, info) => {
-          if (!isVertical.current) {
-            if (info.offset.x <= -70) onDelete();
-            else if (info.offset.x >= 70) onEdit();
-          }
-          startRef.current = null;
-          isVertical.current = false;
-          axisLocked.current = false;
-        }}
-        className={`relative flex items-center px-4 py-3 gap-3 bg-[#1C1C1E]`}>
-        <LogoIcon sub={sub} size="sm" />
-        <div className="min-w-0 flex-1">
-          <div className="flex items-center gap-2">
-            <p className="text-sm font-medium truncate">{sub.name}</p>
-            {cat && <CategoryBadge cat={cat} tiny />}
-            {sub.status === 'paused' && <span className="text-[10px] font-semibold text-red-400 bg-red-500/10 border border-red-500/30 px-1.5 py-0.5 rounded-lg shrink-0">{t.badge_paused}</span>}
-            {sub.status === 'trial'  && <span className="text-[10px] font-semibold text-amber-400 bg-amber-500/10 border border-amber-500/30 px-1.5 py-0.5 rounded-lg shrink-0">{t.badge_trial}</span>}
-          </div>
-          <p className="text-xs text-zinc-500 truncate">
-            {fmtOriginal(sub)} / {sub.period === 'yearly' ? t.sub_per_year : t.sub_per_month}
-            {sub.date && sub.date !== '—' && ` · ${sub.date}`}
-            {sub.status === 'trial' && sub.trial_end && ` · ${fmtDateFromISO(sub.trial_end, lang)}`}
-          </p>
-        </div>
-      </motion.div>
-    </div>
-  );
-};
-
 // ─── Валюта ────────────────────────────────────────────────────────────────────
 // ─── Модалка ───────────────────────────────────────────────────────────────────
 // ─── DatePicker ────────────────────────────────────────────────────────────────
-const DatePicker = ({ value, onChange, label }) => {
-  const t    = useT();
-  const lang = useLang();
-  const [open, setOpen] = useState(false);
-  const today = new Date();
-  const parsed = value ? new Date(value) : null;
-  const [viewYear,  setViewYear]  = useState(parsed?.getFullYear()  ?? today.getFullYear());
-  const [viewMonth, setViewMonth] = useState(parsed?.getMonth()     ?? today.getMonth());
-  const ref = useRef(null);
-
-  useEffect(() => {
-    if (!open) return;
-    const handler = (e) => { if (ref.current && !ref.current.contains(e.target)) setOpen(false); };
-    document.addEventListener('mousedown', handler);
-    document.addEventListener('touchstart', handler);
-    return () => { document.removeEventListener('mousedown', handler); document.removeEventListener('touchstart', handler); };
-  }, [open]);
-
-  const daysInMonth = new Date(viewYear, viewMonth + 1, 0).getDate();
-  const offset = (new Date(viewYear, viewMonth, 1).getDay() + 6) % 7;
-  const cells = [...Array(offset).fill(null), ...Array.from({ length: daysInMonth }, (_, i) => i + 1)];
-
-  const selectDay = (d) => {
-    const mm = String(viewMonth + 1).padStart(2, '0');
-    const dd = String(d).padStart(2, '0');
-    onChange(`${viewYear}-${mm}-${dd}`);
-    setOpen(false);
-  };
-
-  const prevMonth = () => { if (viewMonth === 0) { setViewMonth(11); setViewYear(y => y - 1); } else setViewMonth(m => m - 1); };
-  const nextMonth = () => { if (viewMonth === 11) { setViewMonth(0);  setViewYear(y => y + 1); } else setViewMonth(m => m + 1); };
-
-  const selectedDay   = parsed?.getDate();
-  const selectedMonth = parsed?.getMonth();
-  const selectedYear  = parsed?.getFullYear();
-
-  return (
-    <div ref={ref} className="relative">
-      <div
-        onClick={() => setOpen(v => !v)}
-        className="flex items-center gap-3 bg-amber-500/10 border border-amber-500/30 rounded-2xl px-4 py-3 cursor-pointer active:bg-amber-500/20 transition">
-        <CalendarDays className="w-4 h-4 text-amber-400 shrink-0" />
-        <span className="text-xs text-amber-400 font-medium">{label}</span>
-        <span className="ml-auto text-sm">
-          {parsed
-            ? <span className="text-zinc-200">{fmtDateFromISO(value, lang, 'long')}</span>
-            : <span className="text-zinc-600">{t.datepicker_choose}</span>}
-        </span>
-      </div>
-      <AnimatePresence>
-        {open && (
-          <motion.div
-            initial={{ opacity: 0, y: -6, scale: 0.97 }}
-            animate={{ opacity: 1, y: 0, scale: 1 }}
-            exit={{ opacity: 0, y: -6, scale: 0.97 }}
-            transition={{ duration: 0.15 }}
-            className="absolute top-full mt-2 left-0 right-0 bg-zinc-900 border border-zinc-700 rounded-2xl shadow-2xl z-50 p-4">
-            {/* Навигация по месяцу */}
-            <div className="flex items-center justify-between mb-3">
-              <button type="button" onClick={prevMonth}
-                className="w-7 h-7 rounded-xl bg-zinc-800 border border-zinc-700 flex items-center justify-center text-zinc-400 active:scale-95 transition">
-                <ChevronDown className="w-3.5 h-3.5 rotate-90" />
-              </button>
-              <span className="text-sm font-semibold">{t.months_full[viewMonth]} {viewYear}</span>
-              <button type="button" onClick={nextMonth}
-                className="w-7 h-7 rounded-xl bg-zinc-800 border border-zinc-700 flex items-center justify-center text-zinc-400 active:scale-95 transition">
-                <ChevronDown className="w-3.5 h-3.5 -rotate-90" />
-              </button>
-            </div>
-            {/* Дни недели */}
-            <div className="grid grid-cols-7 mb-1">
-              {t.days_short.map(d => <div key={d} className="text-center text-[10px] text-zinc-600 font-semibold uppercase py-1">{d}</div>)}
-            </div>
-            {/* Дни */}
-            <div className="grid grid-cols-7 gap-0.5">
-              {cells.map((day, i) => {
-                if (!day) return <div key={`e-${i}`} />;
-                const isSelected = day === selectedDay && viewMonth === selectedMonth && viewYear === selectedYear;
-                const isToday    = day === today.getDate() && viewMonth === today.getMonth() && viewYear === today.getFullYear();
-                return (
-                  <button key={day} type="button" onClick={() => selectDay(day)}
-                    className={`aspect-square rounded-xl text-xs font-medium transition active:scale-95
-                      ${isSelected ? 'bg-amber-500 text-black font-bold'
-                        : isToday   ? 'bg-zinc-700 text-white'
-                        : 'text-zinc-300 hover:bg-zinc-800'}`}>
-                    {day}
-                  </button>
-                );
-              })}
-            </div>
-          </motion.div>
-        )}
-      </AnimatePresence>
-    </div>
-  );
-};
-
 const SubModal = ({ initial, currency, onSave, onClose }) => {
   const t    = useT();
   const lang = useLang();
@@ -2126,16 +1783,6 @@ const SubModal = ({ initial, currency, onSave, onClose }) => {
     </>
   );
 };
-
-const NavItem = ({ icon: Icon, label, active, onClick }) => (
-  <button type="button" onClick={onClick}
-    className={`flex flex-col items-center justify-center gap-1 text-xs font-medium tracking-[0.1em] uppercase ${active ? 'text-white' : 'text-zinc-500'}`}>
-    <div className={`w-9 h-9 rounded-2xl flex items-center justify-center border transition ${active ? 'bg-white text-black border-white' : 'border-zinc-800 bg-zinc-900/60'}`}>
-      <Icon className="w-4 h-4" />
-    </div>
-    <span className="text-[9px]">{label}</span>
-  </button>
-);
 
 // ─── Root: онбординг → авторизация → приложение ────────────────────────────────
 // Определён последним — все const-компоненты уже объявлены выше
