@@ -28,7 +28,11 @@ export default defineConfig([
       react: { version: 'detect' },
     },
     rules: {
-      'no-unused-vars': ['error', { varsIgnorePattern: '^[A-Z_]' }],
+      // ignoreRestSiblings: для паттерна `const { unwanted, ...rest } = obj`
+      // (напр. exportJSON в ImportExportMenu.jsx — отсекаем id/user_id/
+      // created_at перед экспортом) — так деструктурированные "лишние"
+      // поля не считаются unused, если рядом есть rest-элемент.
+      'no-unused-vars': ['error', { varsIgnorePattern: '^[A-Z_]', ignoreRestSiblings: true }],
       // Уже используем автоматический JSX-рантайм (Vite/React 19) — import
       // React не нужен в каждом файле, react/prop-types тоже не включаем
       // намеренно: проект не типизирован, это отдельное больше решение.
