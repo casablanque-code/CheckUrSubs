@@ -36,6 +36,9 @@ export const translations = {
     sub_delete:    'Удалить',
     undo:          'Отменить',
 
+    //Подтверждение удаления
+    delete_confirm_hint: 'Вы уверены?',
+
     // Календарь
     calendar_title: 'Календарь',
     expected:      (month) => `Ожидается в ${month}`,
@@ -55,6 +58,9 @@ export const translations = {
     io_import_ok:      (n) => `Импортировано: ${n}`,
     io_import_err:     'Ошибка формата файла',
     io_import_dup:     (n) => `Пропущено дублей: ${n}`,
+
+    // Офлайн
+    offline_banner: 'Нет соединения — изменения недоступны',
 
     // Auth
     auth_tagline:       'Контроль подписок под рукой',
@@ -132,6 +138,7 @@ export const translations = {
     delete_account_title: 'Удалить аккаунт?',
     delete_account_desc: 'Все подписки и данные будут удалены навсегда. Это действие нельзя отменить.',
     delete_type_to_confirm: 'Введите {word} для подтверждения',
+    delete_confirm_word: 'УДАЛИТЬ',
     delete_account_confirm: 'Удалить всё',
     delete_account_loading: 'Удаляем...',
 
@@ -170,6 +177,7 @@ export const translations = {
     badge_trial:  'пробный',
     // DatePicker
     datepicker_choose: 'Выбрать дату',
+    month_placeholder: 'Месяц',
     // Calendar
     not_billing: 'не списывается',
     onb_slides: [
@@ -236,7 +244,6 @@ export const translations = {
     undo:          'Undo',
 
     //Delete confirm
-    delete_confirm_hint: 'Вы уверены?',
     delete_confirm_hint: "Are you sure?",
 
     // Calendar
@@ -245,23 +252,6 @@ export const translations = {
     spent:         (month) => `Spent in ${month}`,
     soon:          'Upcoming',
     soon_empty:    'No payments in the next 7 days',
-
-    // Импорт / Экспорт
-    io_title:          'Данные',
-    io_subtitle:       'Экспорт и импорт подписок',
-    io_export:         'Экспорт',
-    io_export_csv:     'Скачать CSV',
-    io_export_json:    'Скачать JSON',
-    io_import:         'Импорт',
-    io_import_hint:    'CSV или JSON из CheckUrSubs',
-    io_import_btn:     'Выбрать файл',
-    io_import_ok:      (n) => `Импортировано: ${n}`,
-    io_import_err:     'Ошибка формата файла',
-    io_import_dup:     (n) => `Пропущено дублей: ${n}`,
-
-
-    // Офлайн
-    offline_banner: 'Нет соединения — изменения недоступны',
 
     // Offline
     offline_banner: 'No connection — changes unavailable',
@@ -354,7 +344,7 @@ export const translations = {
     delete_account: 'Delete account',
     delete_account_title: 'Delete account?',
     delete_account_desc: 'All your subscriptions and data will be permanently erased. This cannot be undone.',
-    elete_confirm_word: 'DELETE',
+    delete_confirm_word: 'DELETE',
     delete_type_to_confirm: 'Type {word} to confirm',
     delete_account_confirm: 'Delete everything',
     delete_account_loading: 'Deleting...',
@@ -394,6 +384,7 @@ export const translations = {
     badge_trial:  'trial',
     // DatePicker
     datepicker_choose: 'Choose date',
+    month_placeholder: 'Month',
     // Calendar
     not_billing: 'not billing',
     onb_slides: [

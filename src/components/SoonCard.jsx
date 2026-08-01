@@ -1,11 +1,10 @@
-import { useT, useLang } from '../lib/i18n';
+import { useLang } from '../lib/i18n';
 import { getCat } from '../lib/categories';
 import { extractBillingDay } from '../lib/billing';
 import LogoIcon from './LogoIcon';
 import CategoryBadge from './CategoryBadge';
 
 const SoonCard = ({ sub, fmtOriginal }) => {
-  const t    = useT();
   const lang = useLang();
   const cat  = sub.category ? getCat(sub.category) : null;
 

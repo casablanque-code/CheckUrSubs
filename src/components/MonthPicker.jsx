@@ -2,14 +2,16 @@ import { useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { ChevronDown } from 'lucide-react';
 import { MONTHS_SHORT } from '../lib/billing';
+import { useT } from '../lib/i18n';
 
 const MonthPicker = ({ value, onChange }) => {
   const [open, setOpen] = useState(false);
+  const t = useT();
   return (
     <div className="relative">
       <button type="button" onClick={() => setOpen(o => !o)}
         className="w-full bg-black border border-zinc-800 rounded-2xl px-4 py-3 text-sm text-left flex justify-between items-center focus:outline-none focus:border-zinc-500 transition">
-        <span className={value ? 'text-white' : 'text-zinc-600'}>{value || 'Месяц'}</span>
+        <span className={value ? 'text-white' : 'text-zinc-600'}>{value || t.month_placeholder}</span>
         <ChevronDown className="w-4 h-4 text-zinc-500 shrink-0" />
       </button>
       <AnimatePresence>
