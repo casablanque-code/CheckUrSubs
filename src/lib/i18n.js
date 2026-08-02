@@ -113,6 +113,8 @@ export const translations = {
     modal_save:         'Сохранить',
     modal_add:          'Добавить',
     modal_cancel:       'Отмена',
+    cancel_assistant_pre:  'Как ',
+    cancel_assistant_link: 'отменить подписку',
 
     // Строка подписки
     sub_per_month: 'мес',
@@ -320,6 +322,8 @@ export const translations = {
     modal_save:         'Save',
     modal_add:          'Add',
     modal_cancel:       'Cancel',
+    cancel_assistant_pre:  'How to ',
+    cancel_assistant_link: 'cancel subscription',
 
     // Subscription row
     sub_per_month: 'mo',
