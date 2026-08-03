@@ -1,6 +1,6 @@
-# CheckUrSubs 📱
+# CheckUrSubs
 
-> A minimalist subscription tracker. Know exactly what you pay — every month.
+A minimalist subscription tracker. Know exactly what you pay — every month.
 
 ## Featured on Product Hunt
 
@@ -12,15 +12,18 @@
 ![Supabase](https://img.shields.io/badge/Supabase-green)
 ![Vercel](https://img.shields.io/badge/Deployed-Vercel-black)
 
-**[→ Open the app](https://checkursubs.casablanque.com/)**
+**[Open the app](https://checkursubs.casablanque.com/)**
 
 ---
 
 ## About
 
-CheckUrSubs helps you keep track of all your subscriptions — streaming, cloud storage, SaaS tools, mobile plans. See your total spend, upcoming charges, and a breakdown by category.
+CheckUrSubs helps you keep track of all your subscriptions — streaming,
+cloud storage, SaaS tools, mobile plans. See your total spend, upcoming
+charges, and a breakdown by category, all in one place.
 
-Works as a PWA — installs to your home screen on iPhone and Android with no App Store required.
+It works as a PWA and installs to your home screen on iPhone and Android,
+no App Store required.
 
 ![Dashboard](docs/screenshots/dashboard.png)
 
@@ -29,51 +32,54 @@ Works as a PWA — installs to your home screen on iPhone and Android with no Ap
 ## Features
 
 ### Core
-- 📊 **Dashboard** — total per month, year, and day; full subscription list
-- 📅 **Calendar** — see exactly when and how much will be charged, day by day
-- ⏰ **Upcoming** — charges due in the next 7 days
-- 📈 **Analytics** — spending by category and service with progress bars
-- 🌍 **Multi-currency** — RUB, USD, EUR, GBP and more with live exchange rates
-- 🌐 **RU / EN** — full localization with auto-detection by browser language
+- **Dashboard** — total spend per month, per year, and the full subscription list
+- **Calendar** — see exactly when and how much will be charged, day by day
+- **Upcoming** — charges due in the next 7 days
+- **Analytics** — spending by category and by service, with a monthly trend chart
+- **Multi-currency** — RUB, USD, EUR, GBP and more, with live exchange rates
+- **Russian / English** — full localization, auto-detected from the browser on first visit
 
 ### Subscriptions
-- 🔖 **11 categories** — Entertainment, Work, Internet, Games, Education, VPN, Health, Banking, Telecom, AI, Other
-- 🔍 **Autocomplete** — recognizes 60+ popular services, fills in logo and category automatically
-- 📆 **Monthly & yearly** billing with correct cost calculations
-- ↔️ **Swipe gestures** — left to delete, right to edit
-- ↩️ **Undo delete** — 5 seconds to change your mind
+- **11 categories** — Entertainment, Work, Internet, Games, Education, VPN, Health, Banking, Telecom, AI, Other
+- **Autocomplete** — recognizes 60+ popular services and fills in the logo and category automatically
+- **Monthly and yearly billing**, with correct totals for each
+- **Swipe gestures** — swipe left to delete, right to edit
+- **Undo delete** — a 5-second window to change your mind
+- **Import and export** — CSV and JSON, with duplicate detection on import
 
 ### Subscription statuses
-- ✅ **Active** — included in totals and shown in calendar
-- ⏸️ **Paused** — excluded from totals, hidden from calendar
-- 🔬 **Trial** — shown in calendar until trial end date, excluded from totals; automatically becomes active after trial ends
+- **Active** — included in totals, shown in the calendar
+- **Paused** — excluded from totals, hidden from the calendar
+- **Trial** — shown in the calendar until the trial ends, excluded from totals, and switches to active automatically once it does
 
-### UX
-- 🎨 **Dark UI** — clean, native feel
-- 🔐 **Auth** — email/password or Google OAuth
-- 📲 **PWA** — offline cache, home screen icon, no browser chrome
-- 🔔 **Push notifications** — reminder 3 days before billing or trial end
-- 🧭 **Onboarding** — 6-slide walkthrough including PWA install instructions
-- 📭 **Empty states** — thoughtful screens when there's nothing to show
+### Experience
+- **Dark UI** with a clean, native feel
+- **Auth** via email/password or Google OAuth
+- **PWA** — offline cache, home screen icon, no browser chrome
+- **Push notifications** — a reminder 3 days before a billing date or trial end
+- **Onboarding** — a short walkthrough that includes PWA install instructions
+- **Empty states** — considered screens for when there's nothing to show yet
 
 ---
 
 ## Stack
 
-| Layer | Technology |
-|-------|-----------|
-| UI | React 19, Tailwind CSS 4, Framer Motion |
-| Build | Vite 7 |
-| Backend | Supabase (Postgres + Auth + RLS + Edge Functions) |
-| Push | Web Push API + VAPID + Supabase Edge Functions + pg_cron |
-| Monitoring | Sentry (errors + session replays) |
-| Analytics | PostHog (events, funnels, retention) |
-| Deploy | Vercel |
-| Icons | Lucide React |
+| Layer      | Technology                                                |
+|------------|------------------------------------------------------------|
+| UI         | React 19, Tailwind CSS 4, Framer Motion                    |
+| Build      | Vite 7                                                      |
+| Testing    | Vitest                                                      |
+| CI         | GitHub Actions (lint, test, build on every push and PR)     |
+| Backend    | Supabase (Postgres, Auth, RLS, Edge Functions)              |
+| Push       | Web Push API, VAPID, Supabase Edge Functions, pg_cron        |
+| Monitoring | Sentry (errors and session replays)                          |
+| Analytics  | PostHog (events, funnels, retention)                          |
+| Deploy     | Vercel                                                        |
+| Icons      | Lucide React                                                  |
 
 ---
 
-## Getting Started
+## Getting started
 
 ```bash
 # Clone
@@ -87,28 +93,38 @@ npm install
 cp .env.example .env
 # Fill in VITE_SUPABASE_URL and VITE_SUPABASE_ANON_KEY
 
-# Start dev server
+# Start the dev server
 npm run dev
 ```
 
+### Running tests and lint
+
+```bash
+npm run test    # run the test suite once
+npm run test:watch
+npm run lint
+npm run build
+```
+
+These same four steps run in CI on every push and pull request.
+
 ---
 
-## Environment Variables
+## Environment variables
 
 ```env
 VITE_SUPABASE_URL=your_supabase_url
 VITE_SUPABASE_ANON_KEY=your_supabase_anon_key
 ```
 
-Get these from [Supabase Dashboard](https://supabase.com) → Settings → API.
+Get these from the [Supabase dashboard](https://supabase.com) under Settings → API.
 
 ---
 
 ## Database
 
-Main migration — `supabase_migration.sql`.  
-Push subscriptions — `push_migration.sql`.  
-Run both in the Supabase SQL Editor.
+The main migration lives in `supabase_migration.sql`, push subscriptions in
+`push_migration.sql`. Run both in the Supabase SQL Editor.
 
 `subscriptions` table schema:
 
@@ -136,15 +152,15 @@ subscription  text        -- JSON Web Push subscription object
 updated_at    timestamptz
 ```
 
-Row Level Security is enabled — users only see their own data.
+Row Level Security is enabled — each user can only see their own data.
 
 ---
 
-## Push Notifications
+## Push notifications
 
-Implemented via Web Push API + VAPID.
+Implemented via the Web Push API and VAPID.
 
-**Deploy Edge Function:**
+**Deploy the edge function:**
 ```bash
 supabase functions deploy send-push-notifications --project-ref YOUR_REF
 ```
@@ -157,9 +173,9 @@ VAPID_PRIVATE_KEY=...
 
 **Schedule** — pg_cron triggers the function daily at 10:00 UTC (`push_cron.sql`).
 
-Sends a notification 3 days before:
-- A subscription billing date
-- A trial period end date
+A notification is sent 3 days before:
+- a subscription's billing date
+- a trial period's end date
 
 ---
 
@@ -173,33 +189,43 @@ vercel
 vercel --prod
 ```
 
-Add env vars in Vercel Dashboard → Settings → Environment Variables.
+Add the environment variables in the Vercel dashboard under Settings → Environment Variables.
 
 ---
 
-## Installing as PWA
+## Installing as a PWA
 
-**iPhone:** open in Safari → tap Share → "Add to Home Screen"
+**iPhone:** open in Safari, tap Share, then "Add to Home Screen".
 
-**Android:** open in Chrome → menu → "Install app"
+**Android:** open in Chrome, open the menu, then "Install app".
 
-> Push notifications on iOS require PWA install (iOS 16.4+)
+Push notifications on iOS require the PWA to be installed (iOS 16.4+).
 
 ---
 
-## Service Worker & Updates
+## Service worker and updates
 
-The app uses a custom Service Worker (`sw.js`) with:
-- **Automatic update checks** on every app launch (not just every 24h)
-- **Seamless background updates** — new version activates and reloads silently
-- **Cache versioning** — Vite injects a build timestamp on every deploy, old caches are cleared automatically
-- **Network-first** for HTML and navigation; **cache-first** for hashed JS/CSS assets
+The app uses a custom service worker (`sw.js`):
+- checks for updates on every app launch, not just every 24 hours
+- activates new versions and reloads silently in the background
+- gets a fresh cache-version tag injected by Vite on every build, so old
+  caches are cleared automatically
+- serves HTML and navigation network-first, and hashed JS/CSS assets
+  cache-first
 
 ---
 
 ## Monitoring
 
-- **Sentry** — catches JS errors, unhandled Promise rejections, Service Worker failures. Includes Session Replay on errors.
+**Sentry** catches JS errors, unhandled promise rejections, and service
+worker failures, and includes session replay on errors.
+
+---
+
+## Contributing
+
+Pull requests are welcome. CI runs lint, tests, and a build on every PR —
+please make sure `npm run test` and `npm run lint` pass locally first.
 
 ---
 
