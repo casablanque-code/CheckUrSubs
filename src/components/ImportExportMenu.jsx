@@ -66,8 +66,12 @@ const ImportExportMenu = ({ subscriptions, onImport }) => {
         });
       }
       if (!rows.length || !rows[0].name) throw new Error('bad format');
-      await onImport(rows);
-      setImportMsg(t.io_import_ok(rows.length));
+      const result = await onImport(rows);
+      const imported   = result?.imported   ?? rows.length;
+      const duplicates = result?.duplicates ?? 0;
+      setImportMsg(duplicates > 0
+        ? `${t.io_import_ok(imported)} · ${t.io_import_dup(duplicates)}`
+        : t.io_import_ok(imported));
       setImportStatus('ok');
     } catch {
       setImportMsg(t.io_import_err);

@@ -408,7 +408,8 @@ const App = ({ session, toggleLang, lang }) => {
   const handleImport = async (rows) => {
     const existing = new Set(subscriptions.map(s => s.name + '|' + s.price + '|' + s.period));
     const fresh = rows.filter(r => !existing.has(r.name + '|' + r.price + '|' + r.period));
-    if (!fresh.length) return;
+    const duplicates = rows.length - fresh.length;
+    if (!fresh.length) return { imported: 0, duplicates };
     const toInsert = fresh.map(r => ({
       user_id:       session.user.id,
       name:          r.name          || '',
@@ -423,6 +424,7 @@ const App = ({ session, toggleLang, lang }) => {
     }));
     const { data } = await supabase.from('subscriptions').insert(toInsert).select();
     if (data) setSubscriptions(prev => [...prev, ...data]);
+    return { imported: data?.length ?? 0, duplicates };
   };
 
   if (loading) return <LogoLoader />;
