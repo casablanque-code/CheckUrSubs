@@ -8,11 +8,12 @@ import {
   Wifi, Globe, Phone, Server, Tv, MonitorSmartphone, Package, Wallet, MessageCircle, Download, Upload, Bell
 } from 'lucide-react';
 import { supabase } from './lib/supabase';
-import { CURRENCIES, getCurrency, DEFAULT_RATES, fetchRates, loadRates, toUSD, monthlyUSD } from './lib/currency';
+import { toUSD } from './lib/currency';
 import { MONTHS_SHORT, MONTHS_SHORT_RU, TABS, fmtDateFromISO, extractBillingDay, extractBillingMonth, isDueWithinDays } from './lib/billing';
-import { CATEGORIES, getCat } from './lib/categories';
+import { CATEGORIES } from './lib/categories';
 import { urlBase64ToUint8Array } from './lib/push';
 import { useTabSwipe } from './hooks/useTabSwipe';
+import { useCurrency } from './hooks/useCurrency';
 import LogoLoader from './components/LogoLoader';
 import SectionTitle from './components/SectionTitle';
 import CategoryBadge from './components/CategoryBadge';
@@ -51,23 +52,13 @@ const App = ({ session, toggleLang, lang }) => {
   const [loading,       setLoading]       = useState(true);
   const [isOnline,      setIsOnline]      = useState(() => navigator.onLine);
 
-  const [currency,     setCurrency]     = useState(() => {
-    const saved = localStorage.getItem('currency');
-    if (saved) return saved;
-    return lang === 'ru' ? 'RUB' : 'USD';
-  });
-  const [rates,        setRates]        = useState(() => loadRates() || DEFAULT_RATES);
-  const [ratesLoading, setRatesLoading] = useState(false);
   const [activeTab,    setActiveTab]    = useState('home');
   const [isModalOpen,  setIsModalOpen]  = useState(false);
   const [editingSub,   setEditingSub]   = useState(null);
 
-  // При смене языка — менять валюту на дефолт, если юзер не выбирал вручную
-  useEffect(() => {
-    if (!localStorage.getItem('currencyManual')) {
-      setCurrency(lang === 'ru' ? 'RUB' : 'USD');
-    }
-  }, [lang]);
+  const { currency, setCurrencyManual, rates, ratesLoading, refreshRates, fmt, monthly, realUSD, fmtReal, fmtOriginal } = useCurrency(lang);
+  void realUSD; // пока не используется напрямую в App, доступен через хук на будущее
+
   const [toast,        setToast]        = useState(null);
   const [confirmSub,   setConfirmSub]   = useState(null);
   const [sortBy,       setSortBy]       = useState('name');
@@ -125,35 +116,7 @@ const App = ({ session, toggleLang, lang }) => {
     analytics.pushDismissed();
   };
 
-  const curr = getCurrency(currency);
-  const rate = rates[currency] ?? DEFAULT_RATES[currency] ?? 1;
-  const fmt  = (usd) => {
-    const v = usd * rate;
-    const formatted = v % 1 === 0
-      ? Math.round(v).toLocaleString('ru-RU')
-      : v.toLocaleString('ru-RU', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
-    return `${curr.symbol}${formatted}`;
-  };
-
-  // Удобная обёртка с текущими курсами
-  const monthly = (sub) => monthlyUSD(sub, rates);
-
-  // Реальная сумма списания: для годовых — полная, для месячных — месячная
-  const realUSD = (sub) => {
-    const p = toUSD(sub.price ?? sub.price_usd ?? sub.priceUSD ?? 0, sub.currency_code || 'USD', rates);
-    return p; // всегда полная сумма подписки
-  };
-  const fmtReal = (sub) => fmt(sub.period === 'yearly' ? realUSD(sub) : monthly(sub));
-
-  // Оригинальная цена подписки — всегда в той валюте, в которой добавлена
-  const fmtOriginal = (sub) => {
-    const p    = Number(sub.price ?? sub.price_usd ?? sub.priceUSD ?? 0);
-    const code = sub.currency_code || 'USD';
-    const c    = getCurrency(code);
-    return `${c.symbol}${p % 1 === 0 ? p.toFixed(0) : p.toFixed(2)}`;
-  };
-
-  const tabRefs = { home: useRef(null), calendar: useRef(null), analytics: useRef(null) };
+  const tabRefs = useRef({ home: null, calendar: null, analytics: null });
 
   const switchTab = (tab) => {
     setActiveTab(tab);
@@ -163,7 +126,7 @@ const App = ({ session, toggleLang, lang }) => {
 
   // Сбрасываем скролл вкладки при каждом переключении на неё
   useEffect(() => {
-    tabRefs[activeTab]?.current?.scrollTo({ top: 0, behavior: 'instant' });
+    tabRefs.current[activeTab]?.scrollTo({ top: 0, behavior: 'instant' });
   }, [activeTab]);
 
   const swipeRef = useTabSwipe(activeTab, switchTab, !isModalOpen);
@@ -197,18 +160,6 @@ const App = ({ session, toggleLang, lang }) => {
     window.addEventListener('offline', down);
     return () => { window.removeEventListener('online', up); window.removeEventListener('offline', down); };
   }, []);
-
-  // ── Курсы валют ────────────────────────────────────────────────────────────
-  useEffect(() => {
-    const cached = loadRates();
-    if (!cached) { setRatesLoading(true); fetchRates().then(r => { if (r) setRates(r); setRatesLoading(false); }); }
-  }, []);
-
-  useEffect(() => {
-    if (localStorage.getItem('currencyManual')) {
-      localStorage.setItem('currency', currency);
-    }
-  }, [currency]);
 
   useEffect(() => {
     if (!swipeHinted && subscriptions.length > 0) {
@@ -449,7 +400,7 @@ const App = ({ session, toggleLang, lang }) => {
         <div ref={el => { swipeRef.current = el; }} className="flex-1 relative overflow-hidden">
 
           {/* ════ HOME ════ */}
-          <div ref={tabRefs.home} className={`absolute inset-0 overflow-y-auto no-scrollbar pb-32 safe-top ${activeTab === 'home' ? 'block' : 'hidden'}`}>
+          <div ref={el => { tabRefs.current.home = el; }} className={`absolute inset-0 overflow-y-auto no-scrollbar pb-32 safe-top ${activeTab === 'home' ? 'block' : 'hidden'}`}>
             <div className="p-4 space-y-5">
               <header className="relative flex items-center justify-between px-1 pt-2">
                 <SupportMenu />
@@ -503,8 +454,8 @@ const App = ({ session, toggleLang, lang }) => {
                 <p className="text-zinc-500 uppercase text-[10px] tracking-[0.22em] font-semibold mb-2">{t.per_month}</p>
                 <h2 className="text-6xl font-bold tracking-tighter mb-3">{fmt(totalMonthlyUSD)}</h2>
                 <div className="flex items-center justify-center gap-2">
-                  <CurrencySelector value={currency} onChange={(c) => { setCurrency(c); localStorage.setItem('currencyManual', '1'); analytics.currencyChanged(c); }} />
-                  <button onClick={() => { setRatesLoading(true); fetchRates().then(r => { if (r) setRates(r); setRatesLoading(false); }); }}
+                  <CurrencySelector value={currency} onChange={(c) => { setCurrencyManual(c); analytics.currencyChanged(c); }} />
+                  <button onClick={refreshRates}
                     className="w-7 h-7 flex items-center justify-center rounded-full bg-zinc-800/70 border border-zinc-700 text-zinc-400 hover:text-zinc-200 transition active:scale-95">
                     <RefreshCw className={`w-3 h-3 ${ratesLoading ? 'animate-spin' : ''}`} />
                   </button>
@@ -625,7 +576,7 @@ const App = ({ session, toggleLang, lang }) => {
           </div>
 
           {/* ════ CALENDAR ════ */}
-          <div ref={tabRefs.calendar} className={`absolute inset-0 overflow-y-auto no-scrollbar pb-32 safe-top ${activeTab === 'calendar' ? 'block' : 'hidden'}`}>
+          <div ref={el => { tabRefs.current.calendar = el; }} className={`absolute inset-0 overflow-y-auto no-scrollbar pb-32 safe-top ${activeTab === 'calendar' ? 'block' : 'hidden'}`}>
             <div className="p-4 pt-6 space-y-5">
               <header className="flex flex-col items-center gap-2 pt-2 mb-2">
                 <h2 className="text-lg font-semibold tracking-tight">{t.calendar_title}</h2>
@@ -658,7 +609,7 @@ const App = ({ session, toggleLang, lang }) => {
           </div>
 
           {/* ════ ANALYTICS ════ */}
-          <div ref={tabRefs.analytics} className={`absolute inset-0 overflow-y-auto no-scrollbar pb-32 safe-top ${activeTab === 'analytics' ? 'block' : 'hidden'}`}>
+          <div ref={el => { tabRefs.current.analytics = el; }} className={`absolute inset-0 overflow-y-auto no-scrollbar pb-32 safe-top ${activeTab === 'analytics' ? 'block' : 'hidden'}`}>
             <div className="p-4 pt-6 space-y-4">
               <header className="relative flex items-center justify-between px-1 pt-2 mb-2">
                 <div className="w-10 h-10" />{/* spacer */}
@@ -692,7 +643,13 @@ const App = ({ session, toggleLang, lang }) => {
                 });
 
                 // Для каждого месяца считаем реальные списания по датам биллинга
-                const monthlyTotals = months.map(({ month, year }) => {
+                // Сравниваем только month (без year): корректно, пока
+                // trendRange <= 12 — тогда каждый календарный месяц
+                // попадает в окно максимум один раз. Если когда-нибудь
+                // появится диапазон >12 месяцев, здесь нужно будет
+                // сравнивать и year — но у подписок сейчас нет billingYear
+                // в дате ("8 Mar" без года, т.к. это регулярный биллинг).
+                const monthlyTotals = months.map(({ month }) => {
                   return subscriptions.reduce((sum, s) => {
                     if (s.status === 'paused') return sum;
                     if (s.status === 'trial') return sum; // пробные не списываются
