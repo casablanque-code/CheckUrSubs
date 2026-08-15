@@ -150,8 +150,7 @@ const App = ({ session, toggleLang, lang }) => {
     const p    = Number(sub.price ?? sub.price_usd ?? sub.priceUSD ?? 0);
     const code = sub.currency_code || 'USD';
     const c    = getCurrency(code);
-    const v    = sub.period === 'yearly' ? p : p;
-    return `${c.symbol}${v % 1 === 0 ? v.toFixed(0) : v.toFixed(2)}`;
+    return `${c.symbol}${p % 1 === 0 ? p.toFixed(0) : p.toFixed(2)}`;
   };
 
   const tabRefs = { home: useRef(null), calendar: useRef(null), analytics: useRef(null) };
@@ -556,7 +555,7 @@ const App = ({ session, toggleLang, lang }) => {
                 </button>
               </div>
 
-              <SoonSection soonSubs={soonSubs} fmt={fmt} fmtOriginal={fmtOriginal} monthly={monthly} />
+              <SoonSection soonSubs={soonSubs} fmtOriginal={fmtOriginal} />
 
               {subscriptions.length === 0 ? (
                 /* ── Empty state ── */
@@ -935,19 +934,19 @@ const App = ({ session, toggleLang, lang }) => {
             <Trash2 className="w-4 h-4 text-red-400" />
           </div>
           <div>
-            <p className="text-sm font-semibold text-zinc-100">{t.sub_delete || 'Delete'} «{confirmSub.name}»?</p>
-            <p className="text-xs text-zinc-500 mt-0.5">{t.delete_confirm_hint || 'Вы уверены?'}</p>
+            <p className="text-sm font-semibold text-zinc-100">{t.sub_delete} «{confirmSub.name}»?</p>
+            <p className="text-xs text-zinc-500 mt-0.5">{t.delete_confirm_hint}</p>
           </div>
         </div>
         <button
           onClick={() => { triggerDelete(confirmSub); setConfirmSub(null); }}
           className="w-full bg-red-600/90 hover:bg-red-600 text-white text-sm font-semibold py-3 rounded-2xl active:scale-[0.98] transition mb-3">
-          {t.sub_delete || 'Delete'}
+          {t.sub_delete}
         </button>
         <button
           onClick={() => setConfirmSub(null)}
           className="w-full text-zinc-400 text-sm py-2 active:scale-[0.98] transition">
-          {t.modal_cancel || 'Cancel'}
+          {t.modal_cancel}
         </button>
       </motion.div>
     </motion.div>
