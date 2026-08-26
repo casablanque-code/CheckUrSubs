@@ -22,6 +22,23 @@ const injectSwVersion = () => ({
 
 export default defineConfig({
   plugins: [react(), injectSwVersion()],
+  build: {
+    rollupOptions: {
+      output: {
+        // Вендоры почти не меняются между релизами, а app-код — каждый деплой.
+        // Разносим их по чанкам, чтобы браузер кэшировал vendor-чанки отдельно
+        // и не перекачивал их при каждом обновлении (SW проверяет версию на
+        // каждом запуске — см. README, "Service Worker & Updates").
+        manualChunks: {
+          'vendor-react': ['react', 'react-dom'],
+          'vendor-motion': ['framer-motion'],
+          'vendor-sentry': ['@sentry/react'],
+          'vendor-posthog': ['posthog-js'],
+          'vendor-supabase': ['@supabase/supabase-js'],
+        },
+      },
+    },
+  },
   test: {
     // Пока покрываем только чистые функции из src/lib — jsdom не нужен.
     // Когда дойдём до тестов компонентов, поменять на 'jsdom'.
