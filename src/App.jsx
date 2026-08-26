@@ -11,10 +11,10 @@ import { supabase } from './lib/supabase';
 import { toUSD } from './lib/currency';
 import { MONTHS_SHORT, MONTHS_SHORT_RU, TABS, fmtDateFromISO, extractBillingDay, extractBillingMonth, isDueWithinDays } from './lib/billing';
 import { CATEGORIES } from './lib/categories';
-import { urlBase64ToUint8Array } from './lib/push';
 import { useTabSwipe } from './hooks/useTabSwipe';
 import { useCurrency } from './hooks/useCurrency';
 import { useSubscriptions } from './hooks/useSubscriptions';
+import { usePushNotifications } from './hooks/usePushNotifications';
 import LogoLoader from './components/LogoLoader';
 import SectionTitle from './components/SectionTitle';
 import CategoryBadge from './components/CategoryBadge';
@@ -71,54 +71,7 @@ const App = ({ session, toggleLang, lang }) => {
   const [calYear,      setCalYear]      = useState(() => new Date().getFullYear());
   const [trendRange,   setTrendRange]   = useState(6); // 3 | 6 | 12
 
-  const [pushBanner,   setPushBanner]   = useState(false);
-
-  const VAPID_PUBLIC_KEY = 'BI--t_Ek8gyvTt8tn9LTcceNQgrw7u_e1NQFkrFpSqGZ7s2VBJK2hQ2wPfLJ7lckNBiCRqWno1-jg2Qy4qNXvmo';
-
-  // Проверяем нужно ли показать баннер запроса push
-  useEffect(() => {
-    if (!('Notification' in window) || !('serviceWorker' in navigator)) return;
-    if (Notification.permission === 'granted') return; // уже разрешено
-    if (Notification.permission === 'denied') return;  // уже отклонено
-    if (localStorage.getItem('pushBannerDismissed')) return;
-    // Показываем через 3 секунды после входа — не сразу
-    const t = setTimeout(() => setPushBanner(true), 3000);
-    return () => clearTimeout(t);
-  }, []);
-
-  const subscribePush = async () => {
-    try {
-      // Явно запрашиваем разрешение — часть браузеров не спасает без этого
-      const permission = await Notification.requestPermission();
-      if (permission !== 'granted') {
-        setPushBanner(false);
-        return;
-      }
-      const reg = await navigator.serviceWorker.ready;
-      const sub = await reg.pushManager.subscribe({
-        userVisibleOnly: true,
-        applicationServerKey: urlBase64ToUint8Array(VAPID_PUBLIC_KEY),
-      });
-      // Сохраняем подписку в Supabase
-      await supabase.from('push_subscriptions').upsert({
-        user_id: userId,
-        subscription: JSON.stringify(sub.toJSON()), // toJSON() гарантирует { endpoint, keys: { p256dh, auth } }
-        updated_at: new Date().toISOString(),
-      }, { onConflict: 'user_id' });
-      setPushBanner(false);
-      analytics.pushEnabled();
-    } catch (e) {
-      console.error('Push subscribe error:', e);
-      setPushBanner(false);
-    }
-  };
-
-  const dismissPushBanner = () => {
-    localStorage.setItem('pushBannerDismissed', '1');
-    setPushBanner(false);
-    analytics.pushDismissed();
-  };
-
+  const { pushBanner, subscribePush, dismissPushBanner } = usePushNotifications(userId);
   const tabRefs = useRef({ home: null, calendar: null, analytics: null });
 
   const switchTab = (tab) => {
