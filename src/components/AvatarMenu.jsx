@@ -1,8 +1,9 @@
-import { useState, useRef, useEffect } from 'react';
+import { useState, useRef, useEffect, lazy, Suspense } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { LogOut, Trash2 } from 'lucide-react';
 import { useT } from '../lib/i18n';
-import DeleteAccountModal from './DeleteAccountModal';
+
+const DeleteAccountModal = lazy(() => import('./DeleteAccountModal'));
 
 const AvatarMenu = ({ session, onLogout, onDeleteAccount }) => {
   const t = useT();
@@ -59,10 +60,12 @@ const AvatarMenu = ({ session, onLogout, onDeleteAccount }) => {
 
       <AnimatePresence>
         {showDeleteModal && (
-          <DeleteAccountModal
-            onConfirm={async () => { await onDeleteAccount(); setShowDeleteModal(false); }}
-            onCancel={() => setShowDeleteModal(false)}
-          />
+          <Suspense fallback={null}>
+            <DeleteAccountModal
+              onConfirm={async () => { await onDeleteAccount(); setShowDeleteModal(false); }}
+              onCancel={() => setShowDeleteModal(false)}
+            />
+          </Suspense>
         )}
       </AnimatePresence>
     </>

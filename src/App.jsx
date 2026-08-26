@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, lazy, Suspense } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import {
   Home, List, BarChart2, Plus, Pencil, Trash2, CreditCard,
@@ -32,11 +32,15 @@ import AvatarMenu from './components/AvatarMenu';
 import SupportMenu from './components/SupportMenu';
 import ImportExportMenu from './components/ImportExportMenu';
 import CalendarSection from './components/CalendarSection';
-import SubModal from './components/SubModal';
-import Onboarding from './components/Onboarding';
 import { analytics } from './lib/analytics';
 import { LangContext, useT } from './lib/i18n';
 import Auth from './Auth';
+
+// Обе тяжёлые и нужны не всем: SubModal — только когда открыта модалка
+// добавления/редактирования, Onboarding — только новым пользователям
+// при первом визите. Возвращающиеся юзеры их не грузят вообще.
+const SubModal = lazy(() => import('./components/SubModal'));
+const Onboarding = lazy(() => import('./components/Onboarding'));
 
 
 // ─── Константы ────────────────────────────────────────────────────────────────
@@ -613,8 +617,10 @@ const App = ({ session, toggleLang, lang }) => {
 
         <AnimatePresence>
           {isModalOpen && (
-            <SubModal key={editingSub?.id || 'new'} initial={editingSub} currency={currency}
-              onSave={onSaveSub} onClose={() => { setIsModalOpen(false); setEditingSub(null); }} />
+            <Suspense fallback={null}>
+              <SubModal key={editingSub?.id || 'new'} initial={editingSub} currency={currency}
+                onSave={onSaveSub} onClose={() => { setIsModalOpen(false); setEditingSub(null); }} />
+            </Suspense>
           )}
         </AnimatePresence>
 
@@ -715,12 +721,14 @@ export default function Root() {
 
   if (!onboarded) return (
     <LangContext.Provider value={lang}>
-      <Onboarding toggleLang={toggleLang} lang={lang} onDone={(skippedAt) => {
-        if (skippedAt !== undefined) analytics.onboardingSkipped(skippedAt);
-        else analytics.onboardingCompleted();
-        setOnboarded(true);
-        localStorage.setItem('onboarded', '1');
-      }} />
+      <Suspense fallback={<LogoLoader />}>
+        <Onboarding toggleLang={toggleLang} lang={lang} onDone={(skippedAt) => {
+          if (skippedAt !== undefined) analytics.onboardingSkipped(skippedAt);
+          else analytics.onboardingCompleted();
+          setOnboarded(true);
+          localStorage.setItem('onboarded', '1');
+        }} />
+      </Suspense>
     </LangContext.Provider>
   );
   if (!session) return (

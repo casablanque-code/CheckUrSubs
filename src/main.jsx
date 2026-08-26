@@ -3,6 +3,7 @@ import { createRoot } from 'react-dom/client'
 import * as Sentry from '@sentry/react'
 import './index.css'
 import Root from './App.jsx'
+import ErrorFallback from './components/ErrorFallback.jsx'
 
 Sentry.init({
   dsn: 'https://4eec769ae5e649fe68b7d7e7696d4e3e@o4511021878542336.ingest.de.sentry.io/4511021887914064',
@@ -23,7 +24,9 @@ const rootElement = document.getElementById('root')
 
 createRoot(rootElement).render(
   <StrictMode>
-    <Root />
+    <Sentry.ErrorBoundary fallback={({ resetError }) => <ErrorFallback resetError={resetError} />}>
+      <Root />
+    </Sentry.ErrorBoundary>
   </StrictMode>,
 )
 
