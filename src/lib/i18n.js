@@ -95,6 +95,19 @@ export const translations = {
     on_pause:           'На паузе',
     trend_title:        'Тренд расходов',
 
+    // Инсайты (дубли сервисов)
+    insights_title:        'Инсайты',
+    insight_music:   (n, names) => `🎵 ${n} музыкальных сервиса: ${names}. Обычно хватает одного.`,
+    insight_video:   (n, names) => `🎬 ${n} видеосервиса одновременно: ${names}. Попробуйте использовать по очереди.`,
+    insight_ai:      (n, names) => `🤖 ${n} AI-подписки: ${names}. Возможно, хватит одной.`,
+    insight_storage: (n, names) => `☁️ ${n} облачных хранилища: ${names}. Возможно, можно объединить.`,
+
+    // История цены
+    price_history_title:   'История цены',
+    price_was:      (price) => `Было ${price}`,
+    price_up:       (pct)   => `+${pct}%`,
+    price_down:     (pct)   => `−${pct}%`,
+
     // Модал
     modal_edit:         'Редактировать',
     modal_new:          'Новая подписка',
@@ -303,6 +316,19 @@ export const translations = {
     trial_period:       'Trial period',
     on_pause:           'Paused',
     trend_title:        'Spending trend',
+
+    // Insights (duplicate services)
+    insights_title:        'Insights',
+    insight_music:   (n, names) => `🎵 ${n} music services: ${names}. One is usually enough.`,
+    insight_video:   (n, names) => `🎬 ${n} video services at once: ${names}. Try rotating between them.`,
+    insight_ai:      (n, names) => `🤖 ${n} AI subscriptions: ${names}. One might be enough.`,
+    insight_storage: (n, names) => `☁️ ${n} cloud storage plans: ${names}. Consider consolidating.`,
+
+    // Price history
+    price_history_title:   'Price history',
+    price_was:      (price) => `Was ${price}`,
+    price_up:       (pct)   => `+${pct}%`,
+    price_down:     (pct)   => `−${pct}%`,
 
     // Modal
     modal_edit:         'Edit',

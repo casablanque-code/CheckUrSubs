@@ -1,9 +1,10 @@
 import { useRef } from 'react';
 import { motion, useMotionValue } from 'framer-motion';
-import { Pencil, Trash2 } from 'lucide-react';
+import { Pencil, Trash2, TrendingUp } from 'lucide-react';
 import { useT, useLang } from '../lib/i18n';
 import { getCat } from '../lib/categories';
 import { fmtDateFromISO } from '../lib/billing';
+import { getLastPriceChange } from '../lib/priceHistory';
 import LogoIcon from './LogoIcon';
 import CategoryBadge from './CategoryBadge';
 
@@ -21,6 +22,7 @@ const SubscriptionRow = ({ sub, fmtOriginal, onEdit, onDelete }) => {
   const t    = useT();
   const lang = useLang();
   const cat = sub.category ? getCat(sub.category) : null;
+  const priceChange = getLastPriceChange(sub);
   const x = useMotionValue(0);
   const startRef = useRef(null);
   const isVertical = useRef(false);
@@ -92,6 +94,11 @@ const SubscriptionRow = ({ sub, fmtOriginal, onEdit, onDelete }) => {
             {cat && <CategoryBadge cat={cat} tiny />}
             {sub.status === 'paused' && <span className="text-[10px] font-semibold text-red-400 bg-red-500/10 border border-red-500/30 px-1.5 py-0.5 rounded-lg shrink-0">{t.badge_paused}</span>}
             {sub.status === 'trial'  && <span className="text-[10px] font-semibold text-amber-400 bg-amber-500/10 border border-amber-500/30 px-1.5 py-0.5 rounded-lg shrink-0">{t.badge_trial}</span>}
+            {priceChange && priceChange.pct > 0 && (
+              <span className="flex items-center gap-0.5 text-[10px] font-semibold text-orange-400 bg-orange-500/10 border border-orange-500/30 px-1.5 py-0.5 rounded-lg shrink-0">
+                <TrendingUp className="w-2.5 h-2.5" /> {t.price_up(Math.round(priceChange.pct))}
+              </span>
+            )}
           </div>
           <p className="text-xs text-zinc-500 truncate">
             {fmtOriginal(sub)} / {sub.period === 'yearly' ? t.sub_per_year : t.sub_per_month}

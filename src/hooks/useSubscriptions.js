@@ -2,6 +2,7 @@ import { useState, useEffect, useRef } from 'react';
 import { supabase } from '../lib/supabase';
 import { extractBillingDay, MONTHS_SHORT } from '../lib/billing';
 import { analytics } from '../lib/analytics';
+import { withPriceChange } from '../lib/priceHistory';
 
 // Подписки: загрузка из Supabase, CRUD, undo-delete, автоактивация
 // пробных периодов. Раньше всё это жило прямо в App. Поведение
@@ -72,6 +73,7 @@ export const useSubscriptions = (userId, sessionEmail) => {
     };
 
     if (editingSub) {
+      row.price_history = withPriceChange(editingSub, payload.price, payload.currencyCode);
       const { data, error } = await supabase
         .from('subscriptions').update(row).eq('id', editingSub.id).select().single();
       if (!error && data) {
@@ -144,6 +146,7 @@ export const useSubscriptions = (userId, sessionEmail) => {
       logo: sub.logo || '',
       status: sub.status || 'active',
       trial_end: sub.trial_end || null,
+      price_history: sub.price_history || [],
       created_at: sub.created_at,
     };
 

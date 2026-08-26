@@ -1,11 +1,12 @@
 import { useState, useEffect, useRef } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Zap, X } from 'lucide-react';
+import { Zap, X, History } from 'lucide-react';
 import { useT } from '../lib/i18n';
 import { getCurrency } from '../lib/currency';
 import { extractBillingDay } from '../lib/billing';
 import { CATEGORIES, getCat } from '../lib/categories';
 import { SERVICE_CATALOG, getCatalogEntry } from '../lib/serviceCatalog';
+import { getLastPriceChange } from '../lib/priceHistory';
 import ModalCurrencySelector from './ModalCurrencySelector';
 import MonthPicker from './MonthPicker';
 import DatePicker from './DatePicker';
@@ -139,6 +140,21 @@ const SubModal = ({ initial, currency, onSave, onClose }) => {
             </div>
             <ModalCurrencySelector value={modalCurrency} onChange={setModalCurrency} />
           </div>
+          {(() => {
+            const change = initial && getLastPriceChange(initial);
+            if (!change) return null;
+            const prevCurr = getCurrency(change.currencyCode);
+            return (
+              <p className="flex items-center gap-1.5 text-[11px] text-zinc-500 px-1 -mt-2">
+                <History className="w-3 h-3 shrink-0" />
+                {t.price_was(`${prevCurr.symbol}${change.from}`)}
+                {' · '}
+                <span className={change.pct > 0 ? 'text-orange-400' : 'text-emerald-400'}>
+                  {change.pct > 0 ? t.price_up(Math.round(change.pct)) : t.price_down(Math.round(Math.abs(change.pct)))}
+                </span>
+              </p>
+            );
+          })()}
 
           {/* Периодичность */}
           <div className="flex gap-2">

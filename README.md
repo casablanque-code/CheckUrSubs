@@ -124,7 +124,8 @@ Get these from the [Supabase dashboard](https://supabase.com) under Settings →
 ## Database
 
 The main migration lives in `supabase_migration.sql`, push subscriptions in
-`push_migration.sql`. Run both in the Supabase SQL Editor.
+`push_migration.sql`, price history tracking in `price_history_migration.sql`.
+Run all three in the Supabase SQL Editor.
 
 `subscriptions` table schema:
 
@@ -140,6 +141,7 @@ category      text
 logo          text
 status        text        -- 'active' | 'paused' | 'trial'
 trial_end     date        -- trial end date
+price_history jsonb       -- past prices, newest first — see price_history_migration.sql
 created_at    timestamptz
 ```
 

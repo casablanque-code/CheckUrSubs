@@ -32,6 +32,7 @@ import AvatarMenu from './components/AvatarMenu';
 import SupportMenu from './components/SupportMenu';
 import ImportExportMenu from './components/ImportExportMenu';
 import CalendarSection from './components/CalendarSection';
+import InsightsCard from './components/InsightsCard';
 import { analytics } from './lib/analytics';
 import { LangContext, useT } from './lib/i18n';
 import Auth from './Auth';
@@ -399,6 +400,8 @@ const App = ({ session, toggleLang, lang }) => {
                   <div className="h-full w-full bg-gradient-to-r from-purple-500 via-fuchsia-500 to-blue-500 rounded-full" />
                 </div>
               </div>
+
+              <InsightsCard subscriptions={subscriptions} />
 
               {/* ── Тренд расходов по месяцам ── */}
               {(() => {
