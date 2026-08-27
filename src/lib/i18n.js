@@ -102,6 +102,12 @@ export const translations = {
     insight_ai:      (n, names) => `🤖 ${n} AI-подписки: ${names}. Возможно, хватит одной.`,
     insight_storage: (n, names) => `☁️ ${n} облачных хранилища: ${names}. Возможно, можно объединить.`,
 
+    // Подсказки об экономии (годовая оплата / семейные тарифы)
+    savings_title:          'Возможность сэкономить',
+    savings_yearly:  (names) => `📅 У ${names} есть годовая оплата — обычно дешевле, чем платить помесячно.`,
+    savings_family:  (names) => `👨‍👩‍👧 У ${names} есть семейный/групповой тариф — может выйти дешевле, если делить с кем-то.`,
+    savings_caveat:         'Актуальные цены и условия уточняйте у самого сервиса — могут отличаться по региону.',
+
     // История цены
     price_history_title:   'История цены',
     price_was:      (price) => `Было ${price}`,
@@ -323,6 +329,12 @@ export const translations = {
     insight_video:   (n, names) => `🎬 ${n} video services at once: ${names}. Try rotating between them.`,
     insight_ai:      (n, names) => `🤖 ${n} AI subscriptions: ${names}. One might be enough.`,
     insight_storage: (n, names) => `☁️ ${n} cloud storage plans: ${names}. Consider consolidating.`,
+
+    // Savings tips (yearly billing / family plans)
+    savings_title:          'Ways to save',
+    savings_yearly:  (names) => `📅 ${names} offer yearly billing — usually cheaper than paying monthly.`,
+    savings_family:  (names) => `👨‍👩‍👧 ${names} offer a family/group plan — could be cheaper if you split it.`,
+    savings_caveat:         'Check current pricing and terms with the service — they vary by region.',
 
     // Price history
     price_history_title:   'Price history',

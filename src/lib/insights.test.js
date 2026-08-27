@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { getDuplicateGroups } from './insights';
+import { getDuplicateGroups, getYearlySavingsCandidates, getFamilyPlanCandidates } from './insights';
 
 const sub = (name, overrides = {}) => ({ id: name, name, status: 'active', ...overrides });
 
@@ -46,5 +46,47 @@ describe('getDuplicateGroups', () => {
   it('returns an empty array for no subscriptions', () => {
     expect(getDuplicateGroups([])).toEqual([]);
     expect(getDuplicateGroups(undefined)).toEqual([]);
+  });
+});
+
+describe('getYearlySavingsCandidates', () => {
+  it('flags a monthly subscription whose catalog entry has a yearly plan', () => {
+    const result = getYearlySavingsCandidates([sub('Grammarly', { period: 'monthly' })]);
+    expect(result).toEqual([{ id: 'Grammarly', name: 'Grammarly' }]);
+  });
+
+  it('does not flag a subscription already on yearly billing', () => {
+    expect(getYearlySavingsCandidates([sub('Grammarly', { period: 'yearly' })])).toEqual([]);
+  });
+
+  it('does not flag a service with no known yearly plan', () => {
+    expect(getYearlySavingsCandidates([sub('Netflix', { period: 'monthly' })])).toEqual([]);
+  });
+
+  it('ignores paused subscriptions', () => {
+    expect(getYearlySavingsCandidates([sub('Grammarly', { period: 'monthly', status: 'paused' })])).toEqual([]);
+  });
+
+  it('ignores unrecognized subscription names', () => {
+    expect(getYearlySavingsCandidates([sub('Local Gym', { period: 'monthly' })])).toEqual([]);
+  });
+});
+
+describe('getFamilyPlanCandidates', () => {
+  it('flags a subscription whose catalog entry has a family plan', () => {
+    const result = getFamilyPlanCandidates([sub('Spotify')]);
+    expect(result).toEqual([{ id: 'Spotify', name: 'Spotify' }]);
+  });
+
+  it('does not flag a service with no known family plan', () => {
+    expect(getFamilyPlanCandidates([sub('Netflix')])).toEqual([]);
+  });
+
+  it('ignores paused subscriptions', () => {
+    expect(getFamilyPlanCandidates([sub('Spotify', { status: 'paused' })])).toEqual([]);
+  });
+
+  it('applies regardless of billing period', () => {
+    expect(getFamilyPlanCandidates([sub('Spotify', { period: 'yearly' })])).toEqual([{ id: 'Spotify', name: 'Spotify' }]);
   });
 });

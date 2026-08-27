@@ -34,3 +34,26 @@ export const getDuplicateGroups = (subscriptions) => {
   const order = ['music', 'video', 'ai', 'storage'];
   return result.sort((a, b) => order.indexOf(a.type) - order.indexOf(b.type));
 };
+
+// ─── Возможности сэкономить (годовая оплата / семейные тарифы) ─────────────
+// Данные из SERVICE_CATALOG (yearlyAvailable / familyAvailable) — это факт
+// о том, что у сервиса ЕСТЬ такой тариф в принципе, а не текущая цена или
+// размер скидки: те меняются и различаются по региону, поэтому мы их не
+// заявляем. UI должен показывать это как общую подсказку "проверить у
+// сервиса", а не как гарантированную экономию.
+
+// Активные подписки на месячной оплате, у которых есть годовой тариф
+export const getYearlySavingsCandidates = (subscriptions) =>
+  (subscriptions || [])
+    .filter(s => (s.status === 'active' || !s.status) && s.period !== 'yearly')
+    .map(s => ({ id: s.id, name: s.name, entry: getCatalogEntry(s.name) }))
+    .filter(s => s.entry?.yearlyAvailable)
+    .map(({ id, name }) => ({ id, name }));
+
+// Активные подписки, у которых есть семейный/групповой тариф
+export const getFamilyPlanCandidates = (subscriptions) =>
+  (subscriptions || [])
+    .filter(s => s.status === 'active' || !s.status)
+    .map(s => ({ id: s.id, name: s.name, entry: getCatalogEntry(s.name) }))
+    .filter(s => s.entry?.familyAvailable)
+    .map(({ id, name }) => ({ id, name }));
