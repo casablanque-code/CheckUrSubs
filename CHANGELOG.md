@@ -5,6 +5,33 @@ All notable changes to this project are documented in this file.
 The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project follows [Semantic Versioning](https://semver.org/).
 
+## [1.2.0] — 2026-08
+
+### Added
+- **Price history** — editing a subscription's price now records the previous
+  value. A badge shows on the row when a subscription's price recently went
+  up, and the editor shows the last recorded change. Requires the new
+  `price_history` column — see `price_history_migration.sql`.
+- **In-app insights** in the Analytics tab, flagging duplicate subscriptions
+  in the same category (e.g. two music services) — the same detection the
+  monthly push notification already used, now visible without needing push
+  enabled.
+- **Savings tips**: flags active subscriptions known to also offer yearly
+  billing or a family/group plan, with a reminder to check current pricing
+  with the service directly.
+- An error boundary around the app root — a render crash now shows a
+  recoverable screen (and reports to Sentry) instead of a blank page.
+
+### Changed
+- **Subscription rows are now tap-to-edit** instead of swipe-to-edit/delete;
+  deleting moved to a trash icon inside the editor. Swiping between tabs is
+  now more responsive, since the tab-swipe gesture no longer needs a high
+  threshold to avoid conflicting with the old card-swipe gesture.
+- Vendor libraries (React, Framer Motion, Sentry, PostHog, Supabase) now
+  build into separate, independently cacheable chunks, and rarely-used
+  modals (subscription editor, onboarding, delete-account confirmation) are
+  lazy-loaded — smaller initial download for returning users.
+
 ## [1.1.0] — 2026-08
 
 ### Added
