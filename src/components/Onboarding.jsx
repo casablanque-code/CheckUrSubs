@@ -2,7 +2,7 @@ import { useState, useRef } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Sparkles, Plus, List, CalendarDays, BarChart2, Download } from 'lucide-react';
 import { useT } from '../lib/i18n';
-import SwipeDemo from './SwipeDemo';
+import TapEditDemo from './TapEditDemo';
 
 const getOnboardingSteps = (t) => [
   { icon: Sparkles,    iconColor: 'text-white',      iconBg: 'bg-zinc-800',       ...t.onb_slides[0] },
@@ -75,10 +75,10 @@ const Onboarding = ({ onDone, toggleLang, lang }) => {
                 {/* Заголовок */}
                 <h2 className="text-2xl font-bold tracking-tight mb-4">{s.title}</h2>
 
-                {/* Анимация свайпа (только на слайде swipe) */}
+                {/* Анимация тап→редактирование (только на слайде swipe) */}
                 {s.type === 'swipe' && (
                   <div className="w-full mb-4">
-                    <SwipeDemo />
+                    <TapEditDemo />
                   </div>
                 )}
 

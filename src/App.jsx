@@ -24,7 +24,6 @@ import CurrencySelector from './components/CurrencySelector';
 import ModalCurrencySelector from './components/ModalCurrencySelector';
 import MonthPicker from './components/MonthPicker';
 import NavItem from './components/NavItem';
-import SwipeDemo from './components/SwipeDemo';
 import SubscriptionRow from './components/SubscriptionRow';
 import DatePicker from './components/DatePicker';
 import DeleteAccountModal from './components/DeleteAccountModal';
@@ -71,7 +70,6 @@ const App = ({ session, toggleLang, lang }) => {
   const [confirmSub,   setConfirmSub]   = useState(null);
   const [sortBy,       setSortBy]       = useState('name');
   const [searchQuery,  setSearchQuery]  = useState('');
-  const [swipeHinted,  setSwipeHinted]  = useState(() => localStorage.getItem('swipeHinted') === '1');
   const [calMonth,     setCalMonth]     = useState(() => new Date().getMonth());
   const [calYear,      setCalYear]      = useState(() => new Date().getFullYear());
   const [trendRange,   setTrendRange]   = useState(6); // 3 | 6 | 12
@@ -100,13 +98,6 @@ const App = ({ session, toggleLang, lang }) => {
     window.addEventListener('offline', down);
     return () => { window.removeEventListener('online', up); window.removeEventListener('offline', down); };
   }, []);
-
-  useEffect(() => {
-    if (!swipeHinted && subscriptions.length > 0) {
-      const t = setTimeout(() => { setSwipeHinted(true); localStorage.setItem('swipeHinted', '1'); }, 3000);
-      return () => clearTimeout(t);
-    }
-  }, [subscriptions.length, swipeHinted]);
 
   // Только активные считаются в суммах (пробные и паузные = 0)
   const activeSubs  = subscriptions.filter(s => !s.status || s.status === 'active');
@@ -324,14 +315,9 @@ const App = ({ session, toggleLang, lang }) => {
                     )}
                   </div>
                   <div className="bg-[#1C1C1E] rounded-3xl border border-zinc-800/60 divide-y divide-zinc-800/80 overflow-hidden">
-                    {!swipeHinted && sortedSubs.length > 0 && (
-                      <div className="px-4 py-2 text-[10px] text-zinc-600 text-center tracking-wide">
-                        {t.swipe_hint}
-                      </div>
-                    )}
                     {sortedSubs.map(sub => (
                       <SubscriptionRow key={sub.id} sub={sub} fmtOriginal={fmtOriginal}
-                        onEdit={() => openEdit(sub)} onDelete={() => setConfirmSub(sub)} />
+                        onEdit={() => openEdit(sub)} />
                     ))}
                     {sortedSubs.length === 0 && searchQuery && (
                       <div className="flex flex-col items-center gap-2 px-4 py-8 text-center">
@@ -622,7 +608,8 @@ const App = ({ session, toggleLang, lang }) => {
           {isModalOpen && (
             <Suspense fallback={null}>
               <SubModal key={editingSub?.id || 'new'} initial={editingSub} currency={currency}
-                onSave={onSaveSub} onClose={() => { setIsModalOpen(false); setEditingSub(null); }} />
+                onSave={onSaveSub} onClose={() => { setIsModalOpen(false); setEditingSub(null); }}
+                onDelete={editingSub ? () => { setIsModalOpen(false); setConfirmSub(editingSub); } : null} />
             </Suspense>
           )}
         </AnimatePresence>

@@ -16,7 +16,6 @@ export const translations = {
     trial_count:   (n) => `${n} пробных`,
     all_subs:      'Все подписки',
     search_placeholder: 'Поиск...',
-    swipe_hint:    '← свайп для удаления · свайп для редактирования →',
     sort_az:       'А–Я',
     sort_price:    'Цена',
     sort_date:     'Дата',
@@ -212,7 +211,7 @@ export const translations = {
       },
       {
         title: 'Управляй подписками',
-        subtitle: 'Свайп влево — удалить. Свайп вправо — редактировать.',
+        subtitle: 'Нажми на подписку — откроется редактирование. Значок корзины внутри удалит её.',
       },
       {
         title: 'Следи за датами',
@@ -244,7 +243,6 @@ export const translations = {
     trial_count:   (n) => `${n} trial`,
     all_subs:      'All subscriptions',
     search_placeholder: 'Search...',
-    swipe_hint:    '← swipe to delete · swipe to edit →',
     sort_az:       'A–Z',
     sort_price:    'Price',
     sort_date:     'Date',
@@ -440,7 +438,7 @@ export const translations = {
       },
       {
         title: 'Manage subscriptions',
-        subtitle: 'Swipe left to delete. Swipe right to edit.',
+        subtitle: 'Tap a subscription to edit it. The trash icon inside deletes it.',
       },
       {
         title: 'Track billing dates',

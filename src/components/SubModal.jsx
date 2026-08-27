@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Zap, X, History } from 'lucide-react';
+import { Zap, X, History, Trash2 } from 'lucide-react';
 import { useT } from '../lib/i18n';
 import { getCurrency } from '../lib/currency';
 import { extractBillingDay } from '../lib/billing';
@@ -11,7 +11,7 @@ import ModalCurrencySelector from './ModalCurrencySelector';
 import MonthPicker from './MonthPicker';
 import DatePicker from './DatePicker';
 
-const SubModal = ({ initial, currency, onSave, onClose }) => {
+const SubModal = ({ initial, currency, onSave, onClose, onDelete }) => {
   const t    = useT();
   // Валюта модалки: при редактировании — оригинальная валюта подписки, при добавлении — текущая глобальная
   const [modalCurrency, setModalCurrency] = useState(initial?.currency_code || currency);
@@ -85,6 +85,13 @@ const SubModal = ({ initial, currency, onSave, onClose }) => {
       <motion.div initial={{ y: '100%', opacity: 0 }} animate={{ y: 0, opacity: 1 }} exit={{ y: '100%', opacity: 0 }}
         transition={{ type: 'spring', damping: 26, stiffness: 220 }}
         className="fixed bottom-4 left-4 right-4 bg-zinc-900 rounded-[36px] p-7 z-50 border border-zinc-800 max-w-[450px] mx-auto shadow-2xl">
+
+        {onDelete && (
+          <button type="button" onClick={onDelete} aria-label={t.sub_delete}
+            className="absolute top-6 left-6 w-8 h-8 rounded-full flex items-center justify-center text-red-400 bg-red-500/10 border border-red-500/30 active:scale-95 transition">
+            <Trash2 className="w-4 h-4" />
+          </button>
+        )}
 
         <h2 className="text-xl font-semibold mb-5 text-center">{initial ? t.modal_edit : t.modal_new}</h2>
 
