@@ -6,10 +6,10 @@ import { supabase } from '../lib/supabase';
 
 const SUPPORT_LINKS = [
   {
-    id: 'boosty',
-    label: 'Boosty',
+    id: 'ko-fi',
+    label: 'ko-fi',
     hint: 'Card',
-    url: 'https://boosty.to/casablanque/donate',
+    url: 'https://ko-fi.com/casablanque',
     bg: 'bg-orange-500/15',
     border: 'border-orange-500/30',
     color: 'text-orange-400',
