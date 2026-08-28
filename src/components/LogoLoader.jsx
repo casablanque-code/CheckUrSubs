@@ -15,7 +15,7 @@ const LogoLoader = () => (
       <style>{`
         @keyframes bounceIn{from{opacity:0;transform:translateY(14px) scale(.8)}60%{transform:translateY(-2px) scale(1.03)}to{opacity:1;transform:translateY(0) scale(1)}}
         @keyframes ck{from{stroke-dashoffset:36;opacity:0}15%{opacity:1}to{stroke-dashoffset:0;opacity:1}}
-        @keyframes spark{from{offset-distance:0%;opacity:1}85%{opacity:1}to{offset-distance:100%;opacity:0}}
+        @keyframes spark{from{offset-distance:0%;opacity:0}2%{opacity:1}85%{opacity:1}to{offset-distance:100%;opacity:0}}
         @keyframes pulse{from{opacity:0;transform:scale(.3)}30%{opacity:.85;transform:scale(.6)}to{opacity:0;transform:scale(1.5)}}
         .lc3{transform-box:fill-box;transform-origin:center;animation:bounceIn .35s cubic-bezier(.34,1.56,.64,1) .05s both}
         .lc2{transform-box:fill-box;transform-origin:center;animation:bounceIn .35s cubic-bezier(.34,1.56,.64,1) .2s both}
