@@ -141,7 +141,8 @@ const App = ({ session, toggleLang, lang }) => {
   if (loading) return <LogoLoader />;
 
   return (
-    <div className="min-h-screen bg-black text-white font-sans flex justify-center select-none">
+    <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ duration: 0.35 }}
+      className="min-h-screen bg-black text-white font-sans flex justify-center select-none">
       <div className="w-full max-w-[450px] min-h-screen border-x border-zinc-900 bg-black flex flex-col relative overflow-hidden">
 
         {/* ── Офлайн баннер ── */}
@@ -671,7 +672,7 @@ const App = ({ session, toggleLang, lang }) => {
   )}
 </AnimatePresence>
 </div>
-</div>
+</motion.div>
 );
 };
 
