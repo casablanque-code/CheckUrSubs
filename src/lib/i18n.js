@@ -92,7 +92,6 @@ export const translations = {
     by_subscriptions:   'По подпискам',
     trial_period:       'Пробный период',
     on_pause:           'На паузе',
-    trend_title:        'Тренд расходов',
 
     // Инсайты (дубли сервисов)
     insights_title:        'Инсайты',
@@ -322,7 +321,6 @@ export const translations = {
     by_subscriptions:   'By subscription',
     trial_period:       'Trial period',
     on_pause:           'Paused',
-    trend_title:        'Spending trend',
 
     // Insights (duplicate services)
     insights_title:        'Insights',

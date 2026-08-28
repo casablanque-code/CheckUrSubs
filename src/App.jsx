@@ -8,8 +8,7 @@ import {
   Wifi, Globe, Phone, Server, Tv, MonitorSmartphone, Package, Wallet, MessageCircle, Download, Upload, Bell
 } from 'lucide-react';
 import { supabase } from './lib/supabase';
-import { toUSD } from './lib/currency';
-import { MONTHS_SHORT, MONTHS_SHORT_RU, TABS, fmtDateFromISO, extractBillingDay, extractBillingMonth, isDueWithinDays } from './lib/billing';
+import { TABS, fmtDateFromISO, extractBillingMonth, isDueWithinDays } from './lib/billing';
 import { CATEGORIES } from './lib/categories';
 import { useTabSwipe } from './hooks/useTabSwipe';
 import { useCurrency } from './hooks/useCurrency';
@@ -72,7 +71,6 @@ const App = ({ session, toggleLang, lang }) => {
   const [searchQuery,  setSearchQuery]  = useState('');
   const [calMonth,     setCalMonth]     = useState(() => new Date().getMonth());
   const [calYear,      setCalYear]      = useState(() => new Date().getFullYear());
-  const [trendRange,   setTrendRange]   = useState(6); // 3 | 6 | 12
 
   const { pushBanner, subscribePush, dismissPushBanner } = usePushNotifications(userId);
   const tabRefs = useRef({ home: null, calendar: null, analytics: null });
@@ -389,110 +387,6 @@ const App = ({ session, toggleLang, lang }) => {
               </div>
 
               <InsightsCard subscriptions={subscriptions} rates={rates} />
-
-              {/* ── Тренд расходов по месяцам ── */}
-              {(() => {
-                const now = new Date();
-                const monthLabels = lang === 'ru' ? MONTHS_SHORT_RU : MONTHS_SHORT;
-
-                // Строим диапазон месяцев (trendRange штук, включая текущий)
-                const months = Array.from({ length: trendRange }, (_, i) => {
-                  const d = new Date(now.getFullYear(), now.getMonth() - (trendRange - 1 - i), 1);
-                  return { year: d.getFullYear(), month: d.getMonth() };
-                });
-
-                // Для каждого месяца считаем реальные списания по датам биллинга
-                // Сравниваем только month (без year): корректно, пока
-                // trendRange <= 12 — тогда каждый календарный месяц
-                // попадает в окно максимум один раз. Если когда-нибудь
-                // появится диапазон >12 месяцев, здесь нужно будет
-                // сравнивать и year — но у подписок сейчас нет billingYear
-                // в дате ("8 Mar" без года, т.к. это регулярный биллинг).
-                const monthlyTotals = months.map(({ month }) => {
-                  return subscriptions.reduce((sum, s) => {
-                    if (s.status === 'paused') return sum;
-                    if (s.status === 'trial') return sum; // пробные не списываются
-
-                    const billingDay   = extractBillingDay(s.date);
-                    const billingMonth = extractBillingMonth(s.date); // null для месячных
-
-                    if (!billingDay) return sum;
-
-                    if (s.period === 'monthly') {
-                      // Месячная — списывается каждый месяц
-                      return sum + toUSD(s.price ?? 0, s.currency_code || 'USD', rates);
-                    }
-
-                    if (s.period === 'yearly') {
-                      // Годовая — только в тот месяц когда реально списывается
-                      if (billingMonth !== null && billingMonth === month) {
-                        return sum + toUSD(s.price ?? 0, s.currency_code || 'USD', rates);
-                      }
-                      return sum;
-                    }
-
-                    return sum;
-                  }, 0);
-                });
-
-                const maxVal     = Math.max(...monthlyTotals, 0.01);
-                const totalRange = monthlyTotals.reduce((a, v) => a + v, 0);
-
-                return (
-                  <div className="bg-[#1C1C1E] rounded-3xl border border-zinc-800/60 p-5">
-                    {/* Заголовок + переключатель */}
-                    <div className="flex items-center justify-between mb-4">
-                      <p className="text-xs text-zinc-500 uppercase tracking-[0.16em]">{t.trend_title}</p>
-                      <div className="flex items-center gap-1 bg-zinc-800 rounded-xl p-0.5">
-                        {[3, 6, 12].map(r => (
-                          <button key={r} onClick={() => setTrendRange(r)}
-                            className={`text-[10px] font-semibold px-2.5 py-1 rounded-lg transition ${
-                              trendRange === r ? 'bg-zinc-600 text-white' : 'text-zinc-500 hover:text-zinc-300'
-                            }`}>
-                            {r}{lang === 'ru' ? 'м' : 'm'}
-                          </button>
-                        ))}
-                      </div>
-                    </div>
-
-                    {/* Бары */}
-                    <div className="flex items-end gap-1 h-16">
-                      {monthlyTotals.map((val, i) => {
-                        const isCurrentMonth = i === trendRange - 1;
-                        const heightPct = maxVal > 0 ? Math.max(5, (val / maxVal) * 100) : 5;
-                        return (
-                          <div key={i} className="flex-1 flex flex-col items-center gap-1">
-                            <div className="w-full flex items-end" style={{ height: '48px' }}>
-                              <motion.div
-                                key={`${trendRange}-${i}`}
-                                initial={{ height: 0 }}
-                                animate={{ height: `${heightPct}%` }}
-                                transition={{ duration: 0.4, ease: 'easeOut', delay: i * 0.03 }}
-                                className={`w-full rounded-md ${isCurrentMonth ? 'bg-purple-500' : val > 0 ? 'bg-zinc-600' : 'bg-zinc-800'}`}
-                                style={{ minHeight: '3px' }}
-                              />
-                            </div>
-                            {/* Показываем метку только если баров не слишком много */}
-                            {(trendRange <= 6 || i % 2 === 0) && (
-                              <span className={`text-[8px] font-medium leading-none ${isCurrentMonth ? 'text-purple-400' : 'text-zinc-600'}`}>
-                                {monthLabels[months[i].month]}
-                              </span>
-                            )}
-                          </div>
-                        );
-                      })}
-                    </div>
-
-                    {/* Итог за период */}
-                    <div className="flex justify-between items-center mt-3 pt-3 border-t border-zinc-800">
-                      <span className="text-[10px] text-zinc-500">
-                        {lang === 'ru' ? `За ${trendRange} мес.` : `Last ${trendRange}mo`}
-                      </span>
-                      <span className="text-sm font-semibold">{fmt(totalRange)}</span>
-                    </div>
-                  </div>
-                );
-              })()}
               {byCategory.length > 0 && (
                 <div className="bg-[#1C1C1E] rounded-3xl border border-zinc-800/60 p-5 space-y-4">
                   <p className="text-xs text-zinc-500 uppercase tracking-[0.16em]">{t.by_categories}</p>
