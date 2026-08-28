@@ -1,4 +1,6 @@
 import { getCatalogEntry } from './serviceCatalog';
+import { extractBillingDay, extractBillingMonth } from './billing';
+import { toUSD } from './currency';
 
 // ─── Инсайты по подпискам ────────────────────────────────────────────────────
 // Та же логика детекта дублей, что в supabase/functions/send-push-notifications
@@ -57,3 +59,40 @@ export const getFamilyPlanCandidates = (subscriptions) =>
     .map(s => ({ id: s.id, name: s.name, entry: getCatalogEntry(s.name) }))
     .filter(s => s.entry?.familyAvailable)
     .map(({ id, name }) => ({ id, name }));
+
+// ─── Тренд трат месяц-к-месяцу ──────────────────────────────────────────────
+// Та же логика начисления, что в графике тренда на Analytics (App.jsx):
+// месячные подписки считаются каждый месяц, годовые — только в месяц
+// реального списания. Дублируется намеренно (см. аналогичную заметку выше
+// про THRESHOLDS) — держать в одном месте потребовало бы вынести это в общий
+// хук/модуль вместе с графиком, что за рамки этой фичи.
+const monthSpendUSD = (subscriptions, month, rates) =>
+  (subscriptions || []).reduce((sum, s) => {
+    if (s.status === 'paused') return sum;
+    if (s.status === 'trial')  return sum; // пробные не списываются
+    if (!extractBillingDay(s.date)) return sum;
+
+    const price = toUSD(s.price ?? 0, s.currency_code || 'USD', rates);
+    if (s.period === 'monthly') return sum + price;
+    if (s.period === 'yearly') {
+      const billingMonth = extractBillingMonth(s.date);
+      return billingMonth === month ? sum + price : sum;
+    }
+    return sum;
+  }, 0);
+
+// Сравнение трат текущего месяца с предыдущим. null, если сравнивать не с
+// чем (предыдущий месяц — 0) или разница незаметна (округляется в 0%).
+export const getSpendTrendInsight = (subscriptions, rates, now = new Date()) => {
+  const m = now.getMonth();
+  const prevM = m === 0 ? 11 : m - 1;
+
+  const current  = monthSpendUSD(subscriptions, m, rates);
+  const previous = monthSpendUSD(subscriptions, prevM, rates);
+  if (previous <= 0) return null;
+
+  const pct = Math.round(((current - previous) / previous) * 100);
+  if (pct === 0) return null;
+
+  return { pct, direction: pct > 0 ? 'up' : 'down' };
+};

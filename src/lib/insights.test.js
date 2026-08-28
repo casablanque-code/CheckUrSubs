@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { getDuplicateGroups, getYearlySavingsCandidates, getFamilyPlanCandidates } from './insights';
+import { getDuplicateGroups, getYearlySavingsCandidates, getFamilyPlanCandidates, getSpendTrendInsight } from './insights';
 
 const sub = (name, overrides = {}) => ({ id: name, name, status: 'active', ...overrides });
 
@@ -88,5 +88,55 @@ describe('getFamilyPlanCandidates', () => {
 
   it('applies regardless of billing period', () => {
     expect(getFamilyPlanCandidates([sub('Spotify', { period: 'yearly' })])).toEqual([{ id: 'Spotify', name: 'Spotify' }]);
+  });
+});
+
+describe('getSpendTrendInsight', () => {
+  const rates = { USD: 1 };
+  const now = new Date(2026, 2, 15); // 15 марта 2026
+
+  it('detects an increase vs the previous month', () => {
+    const subs = [
+      sub('A', { period: 'monthly', price: 20, currency_code: 'USD', date: '5 Mar' }),
+      sub('B', { period: 'monthly', price: 10, currency_code: 'USD', date: '5 Mar' }),
+    ];
+    // Оба месячные — списываются одинаково каждый месяц, значит без
+    // изменений сами по себе. Добавим годовую, попадающую только на март.
+    subs.push(sub('C', { period: 'yearly', price: 30, currency_code: 'USD', date: '10 Mar' }));
+    const result = getSpendTrendInsight(subs, rates, now);
+    expect(result.direction).toBe('up');
+    expect(result.pct).toBeCloseTo(100); // (60-30)/30 * 100
+  });
+
+  it('detects a decrease vs the previous month', () => {
+    const subs = [sub('A', { period: 'yearly', price: 50, currency_code: 'USD', date: '10 Feb' })];
+    const result = getSpendTrendInsight(subs, rates, now);
+    expect(result.direction).toBe('down');
+    expect(result.pct).toBe(-100); // март: 0, февраль: 50
+  });
+
+  it('returns null when the previous month had no spend to compare against', () => {
+    const subs = [sub('A', { period: 'yearly', price: 50, currency_code: 'USD', date: '10 Mar' })];
+    expect(getSpendTrendInsight(subs, rates, now)).toBeNull();
+  });
+
+  it('returns null when nothing changed', () => {
+    const subs = [sub('A', { period: 'monthly', price: 10, currency_code: 'USD', date: '5 Mar' })];
+    expect(getSpendTrendInsight(subs, rates, now)).toBeNull();
+  });
+
+  it('excludes trial and paused subscriptions, same as the trend chart', () => {
+    const subs = [
+      sub('Trial', { period: 'monthly', price: 999, status: 'trial', date: '5 Mar' }),
+      sub('Paused', { period: 'monthly', price: 999, status: 'paused', date: '5 Mar' }),
+      sub('Yearly', { period: 'yearly', price: 20, currency_code: 'USD', date: '10 Feb' }),
+    ];
+    // Только Yearly считается (в феврале), Trial/Paused игнорируются в обоих месяцах
+    expect(getSpendTrendInsight(subs, rates, now).pct).toBe(-100);
+  });
+
+  it('excludes subscriptions with no valid billing day, same as the trend chart', () => {
+    const subs = [sub('NoDate', { period: 'monthly', price: 999, date: '' })];
+    expect(getSpendTrendInsight(subs, rates, now)).toBeNull();
   });
 });

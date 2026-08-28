@@ -387,7 +387,7 @@ const App = ({ session, toggleLang, lang }) => {
                 </div>
               </div>
 
-              <InsightsCard subscriptions={subscriptions} />
+              <InsightsCard subscriptions={subscriptions} rates={rates} />
 
               {/* ── Тренд расходов по месяцам ── */}
               {(() => {

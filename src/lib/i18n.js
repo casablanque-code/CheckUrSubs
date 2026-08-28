@@ -96,6 +96,9 @@ export const translations = {
 
     // Инсайты (дубли сервисов)
     insights_title:        'Инсайты',
+    trend_insight_title:   'Тренд',
+    trend_insight_down: (pct) => `📉 Траты снизились на ${pct}% по сравнению с прошлым месяцем.`,
+    trend_insight_up:   (pct) => `📈 Траты выросли на ${pct}% по сравнению с прошлым месяцем.`,
     insight_music:   (n, names) => `🎵 ${n} музыкальных сервиса: ${names}. Обычно хватает одного.`,
     insight_video:   (n, names) => `🎬 ${n} видеосервиса одновременно: ${names}. Попробуйте использовать по очереди.`,
     insight_ai:      (n, names) => `🤖 ${n} AI-подписки: ${names}. Возможно, хватит одной.`,
@@ -323,6 +326,9 @@ export const translations = {
 
     // Insights (duplicate services)
     insights_title:        'Insights',
+    trend_insight_title:   'Trend',
+    trend_insight_down: (pct) => `📉 Spending is down ${pct}% vs last month.`,
+    trend_insight_up:   (pct) => `📈 Spending is up ${pct}% vs last month.`,
     insight_music:   (n, names) => `🎵 ${n} music services: ${names}. One is usually enough.`,
     insight_video:   (n, names) => `🎬 ${n} video services at once: ${names}. Try rotating between them.`,
     insight_ai:      (n, names) => `🤖 ${n} AI subscriptions: ${names}. One might be enough.`,
