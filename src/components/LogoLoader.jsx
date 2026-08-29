@@ -24,21 +24,24 @@ const LogoLoader = () => (
         .lspark{offset-path:path('M44 26 L52 37 L66 20');animation:spark .4s ease-out .75s both;opacity:0}
         .lglow{animation:pulse .3s ease-out 1.15s both;opacity:0}
       `}</style>
-      <g className="lc3"><rect x="14" y="38" width="52" height="28" rx="7" fill="#1a1a1a" stroke="url(#brand)" strokeWidth="1.2" strokeOpacity="0.5" /></g>
-      <g className="lc2"><rect x="14" y="30" width="52" height="28" rx="7" fill="#141414" stroke="url(#brand)" strokeWidth="1.4" strokeOpacity="0.7" /></g>
-      <g className="lc1">
+      <g className="lc3" opacity="0"><rect x="14" y="38" width="52" height="28" rx="7" fill="#1a1a1a" stroke="url(#brand)" strokeWidth="1.2" strokeOpacity="0.5" /></g>
+      <g className="lc2" opacity="0"><rect x="14" y="30" width="52" height="28" rx="7" fill="#141414" stroke="url(#brand)" strokeWidth="1.4" strokeOpacity="0.7" /></g>
+      <g className="lc1" opacity="0">
         <rect x="14" y="22" width="52" height="28" rx="7" fill="#0e0e0e" stroke="url(#brand)" strokeWidth="2" />
         <rect x="22" y="32" width="18" height="3" rx="1.5" fill="url(#brand)" />
         <rect x="22" y="38" width="12" height="3" rx="1.5" fill="url(#brand)" fillOpacity="0.75" />
       </g>
       {/* Пульс-вспышка ровно в точке, где заканчивается путь чек-марки (66,20) */}
-      <circle className="lglow" cx="66" cy="20" r="5" fill="url(#glow)" />
+      <circle className="lglow" cx="66" cy="20" r="5" fill="url(#glow)" opacity="0" />
       {/* Искра летит по тому же пути, что рисуется чек-марка (44,26 → 52,37 → 66,20).
           cx/cy — фоллбэк-позиция (начало пути) на случай, если offset-path не
           поддерживается: тогда искра просто останется неподвижной точкой у
-          старта пути, а не улетит в угол вьюбокса. */}
-      <circle className="lspark" cx="44" cy="26" r="2.6" fill="#fff" />
-      <path className="lck" d="M44 26 L52 37 L66 20" stroke="url(#brand)" strokeWidth="3.5" strokeLinecap="round" strokeLinejoin="round" fill="none" />
+          старта пути, а не улетит в угол вьюбокса. opacity="0" задан прямым
+          SVG-атрибутом (не только через CSS/keyframe) — исключает гонку,
+          при которой браузер рисует "сырое" состояние элемента на первый
+          кадр до применения анимации. */}
+      <circle className="lspark" cx="44" cy="26" r="2.6" fill="#fff" opacity="0" />
+      <path className="lck" d="M44 26 L52 37 L66 20" stroke="url(#brand)" strokeWidth="3.5" strokeLinecap="round" strokeLinejoin="round" fill="none" opacity="0" />
     </svg>
   </div>
 );
