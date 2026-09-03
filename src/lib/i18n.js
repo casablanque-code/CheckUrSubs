@@ -164,6 +164,10 @@ export const translations = {
     delete_account_confirm: 'Удалить всё',
     delete_account_loading: 'Удаляем...',
 
+    // VPN-плашка
+    vpn_banner_text: 'Моё приложение не собирает данные, но другие могут. Используйте VPN. Берегите вашу приватность <3',
+    vpn_banner_ok: 'Спасибо',
+
     // Категории
     cat_entertainment: 'Развлечения',
     cat_work:          'Работа',
@@ -392,6 +396,10 @@ export const translations = {
     delete_type_to_confirm: 'Type {word} to confirm',
     delete_account_confirm: 'Delete everything',
     delete_account_loading: 'Deleting...',
+
+    // VPN banner
+    vpn_banner_text: "My app doesn't collect any data but others might. Use a VPN. Protect your privacy <3",
+    vpn_banner_ok: 'Thanks',
 
     // Categories
     cat_entertainment: 'Entertainment',

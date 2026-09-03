@@ -14,6 +14,7 @@ import { useTabSwipe } from './hooks/useTabSwipe';
 import { useCurrency } from './hooks/useCurrency';
 import { useSubscriptions } from './hooks/useSubscriptions';
 import { usePushNotifications } from './hooks/usePushNotifications';
+import { useVpnBanner } from './hooks/useVpnBanner';
 import LogoLoader from './components/LogoLoader';
 import SectionTitle from './components/SectionTitle';
 import CategoryBadge from './components/CategoryBadge';
@@ -26,6 +27,7 @@ import NavItem from './components/NavItem';
 import SubscriptionRow from './components/SubscriptionRow';
 import DatePicker from './components/DatePicker';
 import DeleteAccountModal from './components/DeleteAccountModal';
+import VpnBannerModal from './components/VpnBannerModal';
 import AvatarMenu from './components/AvatarMenu';
 import SupportMenu from './components/SupportMenu';
 import ImportExportMenu from './components/ImportExportMenu';
@@ -60,6 +62,8 @@ const App = ({ session, toggleLang, lang }) => {
 
   const { currency, setCurrencyManual, rates, ratesLoading, refreshRates, fmt, monthly, realUSD, fmtReal, fmtOriginal } = useCurrency(lang);
   void realUSD; // пока не используется напрямую в App, доступен через хук на будущее
+
+  const { visible: showVpnBanner, dismiss: dismissVpnBanner } = useVpnBanner();
 
   const {
     subscriptions, loading, toast,
@@ -564,6 +568,10 @@ const App = ({ session, toggleLang, lang }) => {
       </motion.div>
     </motion.div>
   )}
+</AnimatePresence>
+
+<AnimatePresence>
+  {showVpnBanner && <VpnBannerModal onClose={dismissVpnBanner} />}
 </AnimatePresence>
 </div>
 </motion.div>
